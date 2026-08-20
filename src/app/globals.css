@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fff6ea;
+  --foreground: #4a3f4d;
+
+  --pastel-mint: #d9f8ec;
+  --pastel-cream: #fff6d8;
+  --pastel-peach: #ffe3e8;
+  --pastel-pink: #ffd6e6;
+  --pastel-lavender: #e9e1ff;
+  --pastel-butter: #fff3c4;
+
+  --accent: #ff8fab;
+  --accent-dark: #ff6f91;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "Jua", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  background: var(--background);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  color: var(--foreground);
+  font-family: "Jua", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(255, 214, 230, 0.55), transparent 45%),
+    radial-gradient(circle at 85% 0%, rgba(255, 243, 196, 0.6), transparent 40%),
+    linear-gradient(160deg, #eafcf3 0%, #fffaea 45%, #ffe9ef 100%);
+  letter-spacing: 0.01em;
+  /* background-attachment: fixed 는 iOS Safari에서 스크롤 시 버벅임/깜빡임을 유발해 제외했습니다. */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior-y: none;
+}
+
+@keyframes stamp-pop {
+  0% {
+    transform: scale(0.3) rotate(-20deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15) rotate(8deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(-6deg);
+    opacity: 1;
+  }
+}
+
+@keyframes sparkle {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92) rotate(-3deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12) rotate(3deg);
+  }
+}
+
+@keyframes float-in {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-stamp-pop {
+  animation: stamp-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-sparkle {
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+.animate-float-in {
+  animation: float-in 0.3s ease-out both;
+}
