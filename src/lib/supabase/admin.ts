@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { isSupabaseConfigured, supabaseUrl } from "@/lib/supabase/isConfigured";
 import type { Database } from "@/lib/supabase/types";
 
 // service-role 키를 사용하는 관리자 전용 클라이언트입니다.
@@ -7,14 +8,13 @@ import type { Database } from "@/lib/supabase/types";
 // 신규 학생/멘토 계정 생성, 계정 삭제처럼 auth.users 를 직접 다뤄야 하는
 // 작업(RLS로 클라이언트에서 할 수 없는 것)에만 사용하세요.
 export function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRoleKey) {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!isSupabaseConfigured || !serviceRoleKey) {
     throw new Error(
-      "SUPABASE_SERVICE_ROLE_KEY가 설정되지 않았습니다. .env.local을 확인하세요.",
+      "NEXT_PUBLIC_SUPABASE_URL 또는 SUPABASE_SERVICE_ROLE_KEY가 설정되지 않았습니다. .env.local을 확인하세요.",
     );
   }
-  return createClient<Database>(url, serviceRoleKey, {
+  return createClient<Database>(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
