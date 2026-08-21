@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
 import { getSignedPhotoUrl } from "@/lib/supabase/storage";
-import { todaySeoulDateStr } from "@/lib/date";
+import { nextMentoringDateStr, todaySeoulDateStr } from "@/lib/date";
 import { RealStudentView } from "@/components/student/real/RealStudentView";
+import type { Weekday } from "@/lib/supabase/types";
 
 export default async function StudentPage() {
   if (!isSupabaseConfigured) redirect("/");
@@ -30,9 +31,22 @@ export default async function StudentPage() {
     .eq("record_date", date)
     .maybeSingle();
 
-  const [plannerPhotoUrl, studyPhotoUrl] = await Promise.all([
+  const mentoringDate = profile.mentoring_day
+    ? nextMentoringDateStr(profile.mentoring_day as Weekday)
+    : null;
+
+  const [plannerPhotoUrl, studyPhotoUrl, slotStatusRes, noticesRes] = await Promise.all([
     getSignedPhotoUrl(supabase, record?.planner_photo_url),
     getSignedPhotoUrl(supabase, record?.study_photo_url),
+    mentoringDate
+      ? supabase.rpc("mentoring_slot_status", { p_date: mentoringDate })
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("notices")
+      .select("id, title, is_pinned, created_at")
+      .order("is_pinned", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(3),
   ]);
 
   return (
@@ -41,6 +55,9 @@ export default async function StudentPage() {
       record={record ?? null}
       plannerPhotoUrl={plannerPhotoUrl}
       studyPhotoUrl={studyPhotoUrl}
+      mentoringDate={mentoringDate}
+      slotStatus={slotStatusRes.data ?? []}
+      notices={noticesRes.data ?? []}
     />
   );
 }

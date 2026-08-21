@@ -1,21 +1,26 @@
 "use client";
 
 import { useActionState, useTransition } from "react";
-import { BarChart3, Plus, ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { BarChart3, Megaphone, Plus, ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import Link from "next/link";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RealTopBar } from "@/components/RealTopBar";
 import {
   assignMentor,
+  assignMentoringDay,
   createMentor,
   createStudent,
   deleteProfile,
   unassignMentor,
 } from "@/lib/actions/admin";
-import type { Database } from "@/lib/supabase/types";
+import { weekdayLabel } from "@/lib/date";
+import type { Database, Weekday } from "@/lib/supabase/types";
 import type { RecordStatus } from "@/lib/mock/types";
 
+const WEEKDAYS: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
+
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
-type Link = Database["public"]["Tables"]["mentor_student_links"]["Row"];
+type MentorLink = Database["public"]["Tables"]["mentor_student_links"]["Row"];
 
 export function RealAdminView({
   admin,
@@ -27,7 +32,7 @@ export function RealAdminView({
   admin: Profile;
   students: Profile[];
   mentors: Profile[];
-  links: Link[];
+  links: MentorLink[];
   todayStatus: Map<string, RecordStatus>;
 }) {
   const total = students.length;
@@ -48,6 +53,16 @@ export function RealAdminView({
           </p>
         </div>
 
+        <Link
+          href="/admin/notices"
+          className="flex min-h-12 items-center justify-between rounded-2xl border-2 border-white/70 bg-white/85 px-4 py-3 text-sm font-bold text-gray-800 shadow-md backdrop-blur active:scale-[0.99]"
+        >
+          <span className="flex items-center gap-2">
+            <Megaphone size={16} className="text-rose-500" /> 공지사항 관리
+          </span>
+          <span className="text-xs font-medium text-gray-400">작성 · 수정 · 삭제 →</span>
+        </Link>
+
         <div className="grid grid-cols-3 gap-2">
           <SummaryTile label="전체 학생" value={`${total}명`} />
           <SummaryTile label="오늘 인증 완료" value={`${approvedToday}명`} accent="text-green-600" />
@@ -60,6 +75,7 @@ export function RealAdminView({
               <tr>
                 <th className="px-3 py-2 font-medium">학생</th>
                 <th className="px-3 py-2 font-medium">담당 멘토</th>
+                <th className="px-3 py-2 font-medium">멘토링 요일</th>
                 <th className="px-3 py-2 font-medium">회차</th>
                 <th className="px-3 py-2 font-medium">도장</th>
                 <th className="px-3 py-2 font-medium">오늘</th>
@@ -121,6 +137,12 @@ function StudentRow({
     });
   };
 
+  const handleMentoringDayChange = (day: string) => {
+    startTransition(async () => {
+      await assignMentoringDay(student.id, day as Weekday | "");
+    });
+  };
+
   const handleDelete = () => {
     startTransition(async () => {
       await deleteProfile(student.id);
@@ -146,6 +168,21 @@ function StudentRow({
           {mentors.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="px-3 py-2.5">
+        <select
+          value={student.mentoring_day ?? ""}
+          disabled={pending}
+          onChange={(e) => handleMentoringDayChange(e.target.value)}
+          className="min-h-11 rounded-full border border-gray-200 bg-white px-2 py-2 text-xs text-gray-700"
+        >
+          <option value="">미지정</option>
+          {WEEKDAYS.map((day) => (
+            <option key={day} value={day}>
+              {weekdayLabel(day)}
             </option>
           ))}
         </select>

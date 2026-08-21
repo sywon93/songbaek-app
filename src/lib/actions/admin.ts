@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatStudentId, studentIdToEmail } from "@/lib/auth/student-id";
+import type { Weekday } from "@/lib/supabase/types";
 
 export interface AdminActionState {
   error?: string;
@@ -119,6 +120,16 @@ export async function unassignMentor(studentId: string) {
     .from("mentor_student_links")
     .delete()
     .eq("student_id", studentId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin");
+}
+
+export async function assignMentoringDay(studentId: string, day: Weekday | "") {
+  const { supabase } = await requireAdmin();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ mentoring_day: day || null })
+    .eq("id", studentId);
   if (error) throw new Error(error.message);
   revalidatePath("/admin");
 }

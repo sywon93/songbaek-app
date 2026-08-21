@@ -4,6 +4,8 @@
 
 export type UserRole = "student" | "mentor" | "admin";
 export type SubmissionStatus = "started" | "submitted" | "approved";
+export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri";
+export type MentoringTimeSlot = "slot_1840" | "slot_1915" | "slot_1950" | "slot_2025";
 
 export interface Database {
   public: {
@@ -20,6 +22,7 @@ export interface Database {
           stamp_count: number;
           stamp_goal: number;
           round: number;
+          mentoring_day: Weekday | null;
           created_at: string;
           updated_at: string;
         };
@@ -34,6 +37,7 @@ export interface Database {
           stamp_count?: number;
           stamp_goal?: number;
           round?: number;
+          mentoring_day?: Weekday | null;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
         Relationships: [];
@@ -120,6 +124,61 @@ export interface Database {
           },
         ];
       };
+      mentoring_reservations: {
+        Row: {
+          id: string;
+          student_id: string;
+          session_date: string;
+          time_slot: MentoringTimeSlot;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          session_date: string;
+          time_slot: MentoringTimeSlot;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["mentoring_reservations"]["Insert"]
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "mentoring_reservations_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      notices: {
+        Row: {
+          id: string;
+          title: string;
+          content: string;
+          is_pinned: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          content: string;
+          is_pinned?: boolean;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["notices"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "notices_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -127,10 +186,21 @@ export interface Database {
         Args: { p_student: string };
         Returns: Database["public"]["Tables"]["profiles"]["Row"];
       };
+      mentoring_slot_status: {
+        Args: { p_date: string };
+        Returns: {
+          time_slot: MentoringTimeSlot;
+          is_taken: boolean;
+          is_mine: boolean;
+          reservation_id: string | null;
+        }[];
+      };
     };
     Enums: {
       user_role: UserRole;
       submission_status: SubmissionStatus;
+      weekday: Weekday;
+      mentoring_time_slot: MentoringTimeSlot;
     };
     CompositeTypes: Record<string, never>;
   };

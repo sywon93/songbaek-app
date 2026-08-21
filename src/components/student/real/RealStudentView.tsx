@@ -1,26 +1,40 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import {
   BadgeCheck,
+  CalendarClock,
   CheckCircle2,
   Clock,
   Hourglass,
   Lock,
   MapPin,
+  Megaphone,
   MessageCircle,
   MessageCircleQuestion,
+  Pin,
   PlayCircle,
   RefreshCw,
   Sparkles,
   StickyNote,
+  X,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { PhotoUploader } from "@/components/ui/PhotoUploader";
 import { RealTopBar } from "@/components/RealTopBar";
 import { startNextRound, startToday, submitToday } from "@/lib/actions/study";
+import { cancelMentoringReservation, reserveMentoringSlot } from "@/lib/actions/mentoring";
+import { weekdayLabel } from "@/lib/date";
+import { MENTORING_TIME_SLOTS } from "@/lib/mentoring";
 import type { Database } from "@/lib/supabase/types";
+
+type SlotStatus = Database["public"]["Functions"]["mentoring_slot_status"]["Returns"][number];
+type NoticePreview = Pick<
+  Database["public"]["Tables"]["notices"]["Row"],
+  "id" | "title" | "is_pinned" | "created_at"
+>;
 
 const AddToHomeScreenTip = dynamic(
   () => import("@/components/AddToHomeScreenTip").then((m) => m.AddToHomeScreenTip),
@@ -49,11 +63,17 @@ export function RealStudentView({
   record,
   plannerPhotoUrl,
   studyPhotoUrl,
+  mentoringDate,
+  slotStatus,
+  notices,
 }: {
   profile: Profile;
   record: StudyRecord | null;
   plannerPhotoUrl: string | null;
   studyPhotoUrl: string | null;
+  mentoringDate: string | null;
+  slotStatus: SlotStatus[];
+  notices: NoticePreview[];
 }) {
   const { stamp_count: stampCount, stamp_goal: stampGoal, round } = profile;
   const achieved = stampCount >= stampGoal;
@@ -96,6 +116,8 @@ export function RealStudentView({
             {error}
           </p>
         )}
+
+        <NoticesPreviewSection notices={notices} />
 
         {/* 도장판 */}
         <section className="rounded-2xl border-2 border-white/70 bg-white/80 p-3 shadow-md backdrop-blur sm:p-4">
@@ -304,8 +326,133 @@ export function RealStudentView({
             </div>
           )}
         </section>
+
+        <MentoringReservationSection
+          mentoringDay={profile.mentoring_day}
+          mentoringDate={mentoringDate}
+          slotStatus={slotStatus}
+        />
       </main>
     </div>
+  );
+}
+
+function MentoringReservationSection({
+  mentoringDay,
+  mentoringDate,
+  slotStatus,
+}: {
+  mentoringDay: Profile["mentoring_day"];
+  mentoringDate: string | null;
+  slotStatus: SlotStatus[];
+}) {
+  const [pending, startTransitionFn] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const run = (fn: () => Promise<void>) => {
+    setError(null);
+    startTransitionFn(async () => {
+      try {
+        await fn();
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    });
+  };
+
+  const mine = slotStatus.find((s) => s.is_mine);
+
+  return (
+    <section className="rounded-2xl border-2 border-white/70 bg-white/85 p-3 shadow-md backdrop-blur sm:p-4">
+      <h2 className="mb-1 flex items-center gap-2 text-base font-bold text-gray-800">
+        <CalendarClock size={18} className="text-rose-500" /> 멘토링 현장 만남 예약
+      </h2>
+
+      {!mentoringDay && (
+        <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-400">
+          지정된 멘토링 요일이 없어요. 담당 선생님(관리자)에게 문의해주세요.
+        </p>
+      )}
+
+      {mentoringDay && mentoringDate && (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-500">
+            지정 요일 <span className="font-semibold text-gray-700">{weekdayLabel(mentoringDay)}</span> · 다음 세션{" "}
+            <span className="font-semibold text-gray-700">{mentoringDate}</span>
+          </p>
+
+          {error && (
+            <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-500">{error}</p>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            {MENTORING_TIME_SLOTS.map((slot) => {
+              const status = slotStatus.find((s) => s.time_slot === slot.id);
+              const isTaken = status?.is_taken ?? false;
+              const isMine = status?.is_mine ?? false;
+              const disabled = pending || (isTaken && !isMine) || (mine !== undefined && !isMine);
+
+              return (
+                <button
+                  key={slot.id}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => run(() => reserveMentoringSlot(slot.id))}
+                  className={`min-h-14 rounded-xl border-2 px-2 py-2.5 text-center text-sm font-semibold transition ${
+                    isMine
+                      ? "border-rose-400 bg-rose-50 text-rose-600"
+                      : isTaken
+                        ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300"
+                        : "border-gray-200 bg-white text-gray-700 hover:border-rose-300 active:scale-[0.99] disabled:opacity-60"
+                  }`}
+                >
+                  {slot.label}
+                  <span className="mt-0.5 block text-[11px] font-medium">
+                    {isMine ? "내 예약" : isTaken ? "마감" : "예약 가능"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {mine?.reservation_id && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => run(() => cancelMentoringReservation(mine.reservation_id!))}
+              className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border border-gray-200 bg-white py-2.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 disabled:opacity-60"
+            >
+              <X size={12} /> 예약 취소
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function NoticesPreviewSection({ notices }: { notices: NoticePreview[] }) {
+  if (notices.length === 0) return null;
+  return (
+    <Link
+      href="/student/notices"
+      className="block rounded-2xl border-2 border-white/70 bg-white/85 p-3.5 shadow-md backdrop-blur active:scale-[0.99] sm:p-4"
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="flex items-center gap-1.5 text-sm font-bold text-gray-800">
+          <Megaphone size={16} className="text-rose-500" /> 공지사항
+        </h2>
+        <span className="text-[11px] font-medium text-gray-400">전체보기 →</span>
+      </div>
+      <ul className="space-y-1">
+        {notices.map((n) => (
+          <li key={n.id} className="flex items-center gap-1.5 truncate text-xs text-gray-600">
+            {n.is_pinned && <Pin size={11} className="shrink-0 text-rose-400" />}
+            <span className="truncate">{n.title}</span>
+          </li>
+        ))}
+      </ul>
+    </Link>
   );
 }
 
