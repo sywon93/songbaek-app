@@ -61,7 +61,7 @@ export function LoginForm() {
             <Field
               label="학번"
               name="studentId"
-              placeholder="예: 10305 (1학년 3반 5번)"
+              placeholder="예: 10101 (4~5자리)"
               inputMode="numeric"
               maxLength={5}
             />

@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useTransition } from "react";
-import { BarChart3, Megaphone, Plus, ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { BarChart3, Megaphone, Pencil, Plus, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RealTopBar } from "@/components/RealTopBar";
+import { Modal } from "@/components/ui/Modal";
 import {
   assignMentor,
   assignMentoringDay,
@@ -12,6 +13,7 @@ import {
   createStudent,
   deleteProfile,
   unassignMentor,
+  updateStudentIdNumber,
 } from "@/lib/actions/admin";
 import { weekdayLabel } from "@/lib/date";
 import type { Database, Weekday } from "@/lib/supabase/types";
@@ -39,6 +41,7 @@ export function RealAdminView({
   const approvedToday = students.filter((s) => todayStatus.get(s.id) === "approved").length;
   const notStartedToday = students.filter((s) => !todayStatus.has(s.id)).length;
   const mentorOf = (studentId: string) => links.find((l) => l.student_id === studentId)?.mentor_id ?? "";
+  const [editingStudent, setEditingStudent] = useState<Profile | null>(null);
 
   return (
     <div>
@@ -90,6 +93,7 @@ export function RealAdminView({
                   mentors={mentors}
                   currentMentorId={mentorOf(s.id)}
                   status={todayStatus.get(s.id) ?? "none"}
+                  onEditStudentId={() => setEditingStudent(s)}
                 />
               ))}
             </tbody>
@@ -100,6 +104,12 @@ export function RealAdminView({
         <CreateMentorForm />
         <MentorRoster mentors={mentors} />
       </main>
+
+      <Modal open={editingStudent !== null} onClose={() => setEditingStudent(null)}>
+        {editingStudent && (
+          <EditStudentIdForm student={editingStudent} onDone={() => setEditingStudent(null)} />
+        )}
+      </Modal>
     </div>
   );
 }
@@ -120,11 +130,13 @@ function StudentRow({
   mentors,
   currentMentorId,
   status,
+  onEditStudentId,
 }: {
   student: Profile;
   mentors: Profile[];
   currentMentorId: string;
   status: RecordStatus;
+  onEditStudentId: () => void;
 }) {
   const [pending, startTransition] = useTransition();
   const achieved = student.stamp_count >= student.stamp_goal;
@@ -153,9 +165,14 @@ function StudentRow({
     <tr>
       <td className="px-3 py-2.5">
         <p className="font-medium text-gray-800">{student.name}</p>
-        <p className="text-xs text-gray-400">
-          1학년 {student.class_no}반 {student.student_no}번
-        </p>
+        <button
+          type="button"
+          onClick={onEditStudentId}
+          className="flex items-center gap-1 text-xs text-gray-400 hover:text-rose-500"
+        >
+          학번 {student.student_id_number ?? "미지정"}
+          <Pencil size={10} />
+        </button>
       </td>
       <td className="px-3 py-2.5">
         <select
@@ -263,10 +280,17 @@ function CreateStudentForm() {
       <h2 className="flex items-center gap-1.5 text-base font-bold text-gray-800">
         <UserPlus size={16} className="text-rose-500" /> 학생 계정 추가
       </h2>
-      <div className="grid grid-cols-3 gap-2">
-        <input name="name" placeholder="이름" required className="col-span-3 min-h-12 rounded-lg border border-gray-300 px-3 py-3 text-base sm:col-span-1" />
-        <input name="classNo" type="number" inputMode="numeric" min={1} placeholder="반" required className="min-h-12 rounded-lg border border-gray-300 px-3 py-3 text-base" />
-        <input name="studentNo" type="number" inputMode="numeric" min={1} placeholder="번호" required className="min-h-12 rounded-lg border border-gray-300 px-3 py-3 text-base" />
+      <div className="grid grid-cols-2 gap-2">
+        <input name="name" placeholder="이름" required className="min-h-12 rounded-lg border border-gray-300 px-3 py-3 text-base" />
+        <input
+          name="studentIdNumber"
+          inputMode="numeric"
+          pattern="\d{4,5}"
+          maxLength={5}
+          placeholder="학번 (예: 10101)"
+          required
+          className="min-h-12 rounded-lg border border-gray-300 px-3 py-3 text-base"
+        />
       </div>
       <input
         name="password"
@@ -284,6 +308,41 @@ function CreateStudentForm() {
         className="flex min-h-12 w-full items-center justify-center gap-1.5 rounded-full bg-rose-500 py-3 text-sm font-bold text-white active:scale-[0.99] disabled:opacity-60"
       >
         <Plus size={14} /> {pending ? "생성 중..." : "학생 추가"}
+      </button>
+    </form>
+  );
+}
+
+function EditStudentIdForm({ student, onDone }: { student: Profile; onDone: () => void }) {
+  const [state, action, pending] = useActionState(
+    updateStudentIdNumber.bind(null, student.id),
+    null,
+  );
+
+  useEffect(() => {
+    if (state?.success) onDone();
+  }, [state?.success, onDone]);
+
+  return (
+    <form action={action} className="space-y-3">
+      <h2 className="text-base font-bold text-gray-800">{student.name} 학번 수정</h2>
+      <input
+        name="studentIdNumber"
+        inputMode="numeric"
+        pattern="\d{4,5}"
+        maxLength={5}
+        defaultValue={student.student_id_number ?? ""}
+        placeholder="학번 (예: 10101)"
+        required
+        className="min-h-12 w-full rounded-lg border border-gray-300 px-3 py-3 text-base"
+      />
+      {state?.error && <p className="text-xs font-medium text-red-500">{state.error}</p>}
+      <button
+        type="submit"
+        disabled={pending}
+        className="flex min-h-12 w-full items-center justify-center gap-1.5 rounded-full bg-violet-500 py-3 text-sm font-bold text-white active:scale-[0.99] disabled:opacity-60"
+      >
+        {pending ? "저장 중..." : "저장하기"}
       </button>
     </form>
   );

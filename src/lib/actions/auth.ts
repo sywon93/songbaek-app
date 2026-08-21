@@ -16,7 +16,7 @@ export async function signInStudent(
   const password = String(formData.get("password") ?? "");
 
   if (!isValidStudentId(studentId)) {
-    return { error: "학번은 5자리 숫자예요. (예: 1학년 3반 5번 → 10305)" };
+    return { error: "학번은 4~5자리 숫자예요. (예: 10101)" };
   }
   if (!password) {
     return { error: "비밀번호를 입력해주세요." };

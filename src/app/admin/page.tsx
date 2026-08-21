@@ -24,7 +24,7 @@ export default async function AdminPage() {
 
   const date = todaySeoulDateStr();
   const [studentsRes, mentorsRes, linksRes, recordsRes] = await Promise.all([
-    supabase.from("profiles").select("*").eq("role", "student").order("class_no").order("student_no"),
+    supabase.from("profiles").select("*").eq("role", "student").order("student_id_number"),
     supabase.from("profiles").select("*").eq("role", "mentor").order("name"),
     supabase.from("mentor_student_links").select("*"),
     supabase.from("study_records").select("student_id, status").eq("record_date", date),
