@@ -99,7 +99,7 @@ function ReviewCard({ entry, date }: { entry: StudentWithRecord; date: string })
         <div className="flex-1">
           <p className="text-sm font-semibold text-gray-800">{student.name}</p>
           <p className="text-xs text-gray-400">
-            학번 {student.student_id_number ?? "미지정"} · 도장 {student.stamp_count}/{student.stamp_goal}
+            학번 {student.username ?? "미지정"} · 도장 {student.stamp_count}/{student.stamp_goal}
           </p>
         </div>
         <StatusBadge status={status} />

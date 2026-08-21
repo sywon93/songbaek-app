@@ -35,7 +35,7 @@ export default async function MentorPage() {
           .from("profiles")
           .select("*")
           .in("id", studentIds)
-          .order("student_id_number")
+          .order("username")
       : Promise.resolve({ data: [] as (typeof profile)[] }),
     studentIds.length
       ? supabase

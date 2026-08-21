@@ -107,7 +107,7 @@ export function RealStudentView({
             안녕하세요, {profile.name}님! 👋
           </h1>
           <p className="text-sm text-gray-500">
-            학번 {profile.student_id_number ?? "미지정"} · 오늘도 화이팅! 🌸
+            학번 {profile.username ?? "미지정"} · 오늘도 화이팅! 🌸
           </p>
         </div>
 

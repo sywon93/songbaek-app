@@ -60,7 +60,7 @@ export function LoginForm() {
           <form key="student" action={studentAction} className="space-y-3">
             <Field
               label="학번"
-              name="studentId"
+              name="username"
               placeholder="예: 10101 (4~5자리)"
               inputMode="numeric"
               maxLength={5}
@@ -71,7 +71,7 @@ export function LoginForm() {
           </form>
         ) : (
           <form key="mentor" action={mentorAction} className="space-y-3">
-            <Field label="이메일" name="email" type="email" placeholder="mentor@school.ac.kr" />
+            <Field label="아이디" name="username" placeholder="예: mentor1" />
             <Field label="비밀번호" name="password" type="password" />
             {mentorState?.error && <ErrorText message={mentorState.error} />}
             <SubmitButton pending={mentorPending} label="멘토 로그인" />

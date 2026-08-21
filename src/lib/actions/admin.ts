@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isValidStudentId, studentIdToEmail } from "@/lib/auth/student-id";
+import { isValidStudentUsername, isValidUsername, usernameToEmail } from "@/lib/auth/username";
 import type { Weekday } from "@/lib/supabase/types";
 
 export interface AdminActionState {
@@ -40,19 +40,19 @@ export async function createStudent(
   const studentId = String(formData.get("studentIdNumber") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  if (!name || !isValidStudentId(studentId) || password.length < 6) {
+  if (!name || !isValidStudentUsername(studentId) || password.length < 6) {
     return { error: "이름/학번(4~5자리 숫자)/비밀번호(6자 이상)를 모두 입력해주세요." };
   }
 
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.createUser({
-    email: studentIdToEmail(studentId),
+    email: usernameToEmail(studentId),
     password,
     email_confirm: true,
     user_metadata: {
       role: "student",
       name,
-      student_id_number: studentId,
+      username: studentId,
     },
   });
   if (error) return { error: `학생 계정 생성 실패: ${error.message}` };
@@ -72,24 +72,24 @@ export async function createMentor(
   }
 
   const name = String(formData.get("name") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
+  const username = String(formData.get("username") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
-  if (!name || !email || password.length < 6) {
-    return { error: "이름/이메일/비밀번호(6자 이상)를 모두 입력해주세요." };
+  if (!name || !isValidUsername(username) || password.length < 6) {
+    return { error: "이름/아이디(영문 소문자·숫자·밑줄 3~20자)/비밀번호(6자 이상)를 모두 입력해주세요." };
   }
 
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.createUser({
-    email,
+    email: usernameToEmail(username),
     password,
     email_confirm: true,
-    user_metadata: { role: "mentor", name },
+    user_metadata: { role: "mentor", name, username },
   });
   if (error) return { error: `멘토 계정 생성 실패: ${error.message}` };
 
   revalidatePath("/admin");
-  return { success: `${name} 멘토 계정을 만들었어요.` };
+  return { success: `${name} 멘토 계정을 만들었어요. (아이디 ${username})` };
 }
 
 export async function deleteProfile(userId: string) {
@@ -121,16 +121,16 @@ export async function unassignMentor(studentId: string) {
   revalidatePath("/admin");
 }
 
-export interface UpdateStudentIdState {
+export interface UpdateUsernameState {
   error?: string;
   success?: string;
 }
 
-export async function updateStudentIdNumber(
-  studentId: string,
-  _prev: UpdateStudentIdState | null,
+export async function updateUsername(
+  profileId: string,
+  _prev: UpdateUsernameState | null,
   formData: FormData,
-): Promise<UpdateStudentIdState> {
+): Promise<UpdateUsernameState> {
   let supabase;
   try {
     ({ supabase } = await requireAdmin());
@@ -138,29 +138,42 @@ export async function updateStudentIdNumber(
     return { error: (e as Error).message };
   }
 
-  const newStudentId = String(formData.get("studentIdNumber") ?? "").trim();
-  if (!isValidStudentId(newStudentId)) {
-    return { error: "학번은 4~5자리 숫자로 입력해주세요." };
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", profileId)
+    .single();
+
+  const newUsername = String(formData.get("username") ?? "").trim().toLowerCase();
+  const valid =
+    target?.role === "student" ? isValidStudentUsername(newUsername) : isValidUsername(newUsername);
+  if (!valid) {
+    return {
+      error:
+        target?.role === "student"
+          ? "학번은 4~5자리 숫자로 입력해주세요."
+          : "아이디는 영문 소문자/숫자/밑줄 3~20자로 입력해주세요.",
+    };
   }
 
   const admin = createAdminClient();
-  const { error: authError } = await admin.auth.admin.updateUserById(studentId, {
-    email: studentIdToEmail(newStudentId),
+  const { error: authError } = await admin.auth.admin.updateUserById(profileId, {
+    email: usernameToEmail(newUsername),
   });
   if (authError) {
-    return { error: `학번 변경 실패: ${authError.message}` };
+    return { error: `아이디 변경 실패: ${authError.message}` };
   }
 
   const { error: profileError } = await supabase
     .from("profiles")
-    .update({ student_id_number: newStudentId })
-    .eq("id", studentId);
+    .update({ username: newUsername })
+    .eq("id", profileId);
   if (profileError) {
     return { error: `로그인 정보는 변경됐지만 프로필 저장에 실패했어요: ${profileError.message}` };
   }
 
   revalidatePath("/admin");
-  return { success: `학번을 ${newStudentId}(으)로 변경했어요.` };
+  return { success: `아이디를 ${newUsername}(으)로 변경했어요.` };
 }
 
 export async function assignMentoringDay(studentId: string, day: Weekday | "") {

@@ -15,7 +15,7 @@ export interface Database {
           id: string;
           role: UserRole;
           name: string;
-          student_id_number: string | null;
+          username: string | null;
           phone: string | null;
           avatar_url: string | null;
           stamp_count: number;
@@ -29,7 +29,7 @@ export interface Database {
           id: string;
           role?: UserRole;
           name: string;
-          student_id_number?: string | null;
+          username?: string | null;
           phone?: string | null;
           avatar_url?: string | null;
           stamp_count?: number;

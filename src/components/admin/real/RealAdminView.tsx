@@ -13,7 +13,7 @@ import {
   createStudent,
   deleteProfile,
   unassignMentor,
-  updateStudentIdNumber,
+  updateUsername,
 } from "@/lib/actions/admin";
 import { weekdayLabel } from "@/lib/date";
 import type { Database, Weekday } from "@/lib/supabase/types";
@@ -41,7 +41,7 @@ export function RealAdminView({
   const approvedToday = students.filter((s) => todayStatus.get(s.id) === "approved").length;
   const notStartedToday = students.filter((s) => !todayStatus.has(s.id)).length;
   const mentorOf = (studentId: string) => links.find((l) => l.student_id === studentId)?.mentor_id ?? "";
-  const [editingStudent, setEditingStudent] = useState<Profile | null>(null);
+  const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
 
   return (
     <div>
@@ -93,7 +93,7 @@ export function RealAdminView({
                   mentors={mentors}
                   currentMentorId={mentorOf(s.id)}
                   status={todayStatus.get(s.id) ?? "none"}
-                  onEditStudentId={() => setEditingStudent(s)}
+                  onEditUsername={() => setEditingProfile(s)}
                 />
               ))}
             </tbody>
@@ -102,12 +102,12 @@ export function RealAdminView({
 
         <CreateStudentForm />
         <CreateMentorForm />
-        <MentorRoster mentors={mentors} />
+        <MentorRoster mentors={mentors} onEditUsername={setEditingProfile} />
       </main>
 
-      <Modal open={editingStudent !== null} onClose={() => setEditingStudent(null)}>
-        {editingStudent && (
-          <EditStudentIdForm student={editingStudent} onDone={() => setEditingStudent(null)} />
+      <Modal open={editingProfile !== null} onClose={() => setEditingProfile(null)}>
+        {editingProfile && (
+          <EditUsernameForm profile={editingProfile} onDone={() => setEditingProfile(null)} />
         )}
       </Modal>
     </div>
@@ -130,13 +130,13 @@ function StudentRow({
   mentors,
   currentMentorId,
   status,
-  onEditStudentId,
+  onEditUsername,
 }: {
   student: Profile;
   mentors: Profile[];
   currentMentorId: string;
   status: RecordStatus;
-  onEditStudentId: () => void;
+  onEditUsername: () => void;
 }) {
   const [pending, startTransition] = useTransition();
   const achieved = student.stamp_count >= student.stamp_goal;
@@ -167,10 +167,10 @@ function StudentRow({
         <p className="font-medium text-gray-800">{student.name}</p>
         <button
           type="button"
-          onClick={onEditStudentId}
+          onClick={onEditUsername}
           className="flex items-center gap-1 text-xs text-gray-400 hover:text-rose-500"
         >
-          학번 {student.student_id_number ?? "미지정"}
+          학번 {student.username ?? "미지정"}
           <Pencil size={10} />
         </button>
       </td>
@@ -243,7 +243,13 @@ function StudentRow({
   );
 }
 
-function MentorRoster({ mentors }: { mentors: Profile[] }) {
+function MentorRoster({
+  mentors,
+  onEditUsername,
+}: {
+  mentors: Profile[];
+  onEditUsername: (mentor: Profile) => void;
+}) {
   const [pending, startTransition] = useTransition();
   const handleDelete = (id: string) => {
     startTransition(async () => {
@@ -256,7 +262,17 @@ function MentorRoster({ mentors }: { mentors: Profile[] }) {
       <div className="space-y-2">
         {mentors.map((m) => (
           <div key={m.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2 text-sm">
-            <span className="font-medium text-gray-700">{m.name}</span>
+            <div>
+              <span className="font-medium text-gray-700">{m.name}</span>
+              <button
+                type="button"
+                onClick={() => onEditUsername(m)}
+                className="ml-2 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-rose-500"
+              >
+                아이디 {m.username ?? "미지정"}
+                <Pencil size={10} />
+              </button>
+            </div>
             <button
               type="button"
               disabled={pending}
@@ -313,11 +329,12 @@ function CreateStudentForm() {
   );
 }
 
-function EditStudentIdForm({ student, onDone }: { student: Profile; onDone: () => void }) {
+function EditUsernameForm({ profile, onDone }: { profile: Profile; onDone: () => void }) {
   const [state, action, pending] = useActionState(
-    updateStudentIdNumber.bind(null, student.id),
+    updateUsername.bind(null, profile.id),
     null,
   );
+  const isStudent = profile.role === "student";
 
   useEffect(() => {
     if (state?.success) onDone();
@@ -325,14 +342,16 @@ function EditStudentIdForm({ student, onDone }: { student: Profile; onDone: () =
 
   return (
     <form action={action} className="space-y-3">
-      <h2 className="text-base font-bold text-gray-800">{student.name} 학번 수정</h2>
+      <h2 className="text-base font-bold text-gray-800">
+        {profile.name} {isStudent ? "학번" : "아이디"} 수정
+      </h2>
       <input
-        name="studentIdNumber"
-        inputMode="numeric"
-        pattern="\d{4,5}"
-        maxLength={5}
-        defaultValue={student.student_id_number ?? ""}
-        placeholder="학번 (예: 10101)"
+        name="username"
+        inputMode={isStudent ? "numeric" : "text"}
+        pattern={isStudent ? "\\d{4,5}" : "[a-zA-Z0-9_]{3,20}"}
+        maxLength={isStudent ? 5 : 20}
+        defaultValue={profile.username ?? ""}
+        placeholder={isStudent ? "학번 (예: 10101)" : "아이디 (예: mentor1)"}
         required
         className="min-h-12 w-full rounded-lg border border-gray-300 px-3 py-3 text-base"
       />
@@ -356,7 +375,14 @@ function CreateMentorForm() {
         <UserPlus size={16} className="text-violet-500" /> 멘토 계정 추가
       </h2>
       <input name="name" placeholder="이름" required className="min-h-12 w-full rounded-lg border border-gray-300 px-3 py-3 text-base" />
-      <input name="email" type="email" placeholder="이메일" required className="min-h-12 w-full rounded-lg border border-gray-300 px-3 py-3 text-base" />
+      <input
+        name="username"
+        pattern="[a-zA-Z0-9_]{3,20}"
+        maxLength={20}
+        placeholder="아이디 (예: mentor1)"
+        required
+        className="min-h-12 w-full rounded-lg border border-gray-300 px-3 py-3 text-base"
+      />
       <input
         name="password"
         type="password"
