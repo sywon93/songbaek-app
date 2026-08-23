@@ -185,3 +185,22 @@ export async function assignMentoringDay(studentId: string, day: Weekday | "") {
   if (error) throw new Error(error.message);
   revalidatePath("/admin");
 }
+
+export async function adminSetStamp(payload: {
+  studentId: string;
+  date: string;
+  approve: boolean;
+  message?: string;
+}) {
+  const { supabase } = await requireAdmin();
+  const { error } = await supabase.rpc("admin_set_stamp", {
+    p_student: payload.studentId,
+    p_date: payload.date,
+    p_approved: payload.approve,
+    p_message: payload.message ?? null,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/records");
+  revalidatePath("/mentor");
+  revalidatePath("/student");
+}

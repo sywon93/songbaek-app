@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { BarChart3, Megaphone, Pencil, Plus, ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { BarChart3, ClipboardList, Megaphone, Pencil, Plus, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RealTopBar } from "@/components/RealTopBar";
@@ -55,6 +55,16 @@ export function RealAdminView({
             전체 {total}명 · 오늘 인증 완료 {approvedToday}명 · 미시작 {notStartedToday}명
           </p>
         </div>
+
+        <Link
+          href="/admin/records"
+          className="flex min-h-12 items-center justify-between rounded-2xl border-2 border-white/70 bg-white/85 px-4 py-3 text-sm font-bold text-gray-800 shadow-md backdrop-blur active:scale-[0.99]"
+        >
+          <span className="flex items-center gap-2">
+            <ClipboardList size={16} className="text-rose-500" /> 전체 학생 학습 기록 및 도장 관리
+          </span>
+          <span className="text-xs font-medium text-gray-400">날짜별 조회 · 수동 승인 →</span>
+        </Link>
 
         <Link
           href="/admin/notices"

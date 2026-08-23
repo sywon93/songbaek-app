@@ -90,6 +90,7 @@ export interface Database {
           reviewed_by: string | null;
           reviewed_at: string | null;
           encouragement_message: string | null;
+          manual_override: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -108,6 +109,7 @@ export interface Database {
           reviewed_by?: string | null;
           reviewed_at?: string | null;
           encouragement_message?: string | null;
+          manual_override?: boolean;
         };
         Update: Partial<
           Database["public"]["Tables"]["study_records"]["Insert"]
@@ -192,6 +194,15 @@ export interface Database {
           is_mine: boolean;
           reservation_id: string | null;
         }[];
+      };
+      admin_set_stamp: {
+        Args: {
+          p_student: string;
+          p_date: string;
+          p_approved: boolean;
+          p_message: string | null;
+        };
+        Returns: Database["public"]["Tables"]["study_records"]["Row"];
       };
     };
     Enums: {
