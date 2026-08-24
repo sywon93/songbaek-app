@@ -24,14 +24,14 @@ export function AdminLoginForm() {
       >
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-500">
-            이메일
+            아이디
           </label>
           <input
             name="email"
-            type="email"
+            type="text"
             required
             autoComplete="username"
-            placeholder="admin@school.ac.kr"
+            placeholder="admin2"
             className="min-h-12 w-full rounded-xl border border-gray-300 px-3 py-3 text-base focus:border-purple-500 focus:outline-none"
           />
         </div>

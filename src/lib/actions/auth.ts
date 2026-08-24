@@ -66,18 +66,22 @@ export async function signInAdmin(
   _prevState: AuthActionState | null,
   formData: FormData,
 ): Promise<AuthActionState> {
-  const email = String(formData.get("email") ?? "").trim();
+  const identifier = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  if (!email || !password) {
-    return { error: "이메일과 비밀번호를 입력해주세요." };
+  if (!identifier || !password) {
+    return { error: "아이디(또는 이메일)와 비밀번호를 입력해주세요." };
   }
+
+  // 관리자는 아이디(예: admin2)만 입력해도 로그인할 수 있고, 예전처럼 실제
+  // 이메일을 그대로 입력해도 동작하도록 둘 다 지원합니다.
+  const email = identifier.includes("@") ? identifier : usernameToEmail(identifier.toLowerCase());
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error || !data.user) {
-    return { error: "이메일 또는 비밀번호가 올바르지 않아요." };
+    return { error: "아이디(또는 이메일) 또는 비밀번호가 올바르지 않아요." };
   }
 
   const { data: profile } = await supabase
