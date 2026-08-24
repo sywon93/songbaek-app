@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
 import { getSignedPhotoUrl } from "@/lib/supabase/storage";
-import { nextMentoringDateStr, todaySeoulDateStr } from "@/lib/date";
+import { currentStudyDateStr, nextMentoringDateStr } from "@/lib/date";
 import {
   RealMentorView,
   type StudentScheduleEntry,
@@ -33,7 +33,7 @@ export default async function MentorPage() {
     .eq("mentor_id", user.id);
   const studentIds = (links ?? []).map((l) => l.student_id);
 
-  const date = todaySeoulDateStr();
+  const date = currentStudyDateStr();
   const [studentsRes, recordsRes] = await Promise.all([
     studentIds.length
       ? supabase

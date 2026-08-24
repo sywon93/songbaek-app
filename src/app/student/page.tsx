@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
 import { getSignedPhotoUrl } from "@/lib/supabase/storage";
-import { nextMentoringDateStr, todaySeoulDateStr } from "@/lib/date";
+import { currentStudyDateStr, nextMentoringDateStr } from "@/lib/date";
 import { RealStudentView } from "@/components/student/real/RealStudentView";
 import type { Weekday } from "@/lib/supabase/types";
 
@@ -23,7 +23,7 @@ export default async function StudentPage() {
   if (!profile) redirect("/login");
   if (profile.role !== "student") redirect(`/${profile.role}`);
 
-  const date = todaySeoulDateStr();
+  const date = currentStudyDateStr();
   const { data: record } = await supabase
     .from("study_records")
     .select("*")

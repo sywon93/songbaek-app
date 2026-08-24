@@ -12,6 +12,40 @@ export function todaySeoulDateStr(): string {
   }).format(new Date());
 }
 
+// 자정(00:00)부터 새벽 4시 전까지는 아직 "전날" 학습일로 취급하는 마감 유예
+// 시각입니다. 밤을 새워 공부하는 학생들이 새벽에 인증 사진/일지를 올려도
+// 전날 학습 기록으로 저장되도록 하기 위한 규칙이며, 달력상의 실제 오늘 날짜가
+// 필요한 곳(예: 상담 요일 계산)에는 영향을 주지 않습니다.
+const LATE_NIGHT_GRACE_END_HOUR = 4;
+
+// 학습 기록(record_date) 저장/조회에 사용하는 "현재 학습일"을 계산합니다.
+// Asia/Seoul 기준 00:00~04:00 사이에는 하루 전 날짜를 반환합니다.
+export function currentStudyDateStr(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
+  const year = Number(get("year"));
+  const month = Number(get("month"));
+  const day = Number(get("day"));
+  const hour = Number(get("hour"));
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (hour < LATE_NIGHT_GRACE_END_HOUR) {
+    date.setUTCDate(date.getUTCDate() - 1);
+  }
+
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 const WEEKDAY_ORDER: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
 
 const WEEKDAY_LABEL: Record<Weekday, string> = {

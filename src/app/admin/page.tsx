@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
-import { todaySeoulDateStr } from "@/lib/date";
+import { currentStudyDateStr } from "@/lib/date";
 import { RealAdminView } from "@/components/admin/real/RealAdminView";
 import type { RecordStatus } from "@/lib/mock/types";
 
@@ -22,7 +22,7 @@ export default async function AdminPage() {
   if (!profile) redirect("/login/admin");
   if (profile.role !== "admin") redirect(`/${profile.role}`);
 
-  const date = todaySeoulDateStr();
+  const date = currentStudyDateStr();
   const [studentsRes, mentorsRes, linksRes, recordsRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("role", "student").order("username"),
     supabase.from("profiles").select("*").eq("role", "mentor").order("name"),

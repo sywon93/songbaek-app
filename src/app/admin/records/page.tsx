@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
 import { getSignedPhotoUrl } from "@/lib/supabase/storage";
-import { todaySeoulDateStr } from "@/lib/date";
+import { currentStudyDateStr } from "@/lib/date";
 import { AdminRecordsView, type AdminRecordEntry } from "@/components/admin/real/AdminRecordsView";
 
 export default async function AdminRecordsPage({
@@ -27,7 +27,7 @@ export default async function AdminRecordsPage({
   if (profile.role !== "admin") redirect(`/${profile.role}`);
 
   const { date: rawDate } = await searchParams;
-  const date = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todaySeoulDateStr();
+  const date = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : currentStudyDateStr();
 
   const [studentsRes, mentorsRes, linksRes, recordsRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("role", "student").order("username"),

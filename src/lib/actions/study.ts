@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { uploadStudyPhoto } from "@/lib/supabase/storage";
-import { todaySeoulDateStr } from "@/lib/date";
+import { currentStudyDateStr } from "@/lib/date";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -17,7 +17,7 @@ async function requireUser() {
 export async function startToday(plannerPhotoDataUrl: string) {
   if (!plannerPhotoDataUrl) throw new Error("플래너 사진을 올려주세요.");
   const { supabase, user } = await requireUser();
-  const date = todaySeoulDateStr();
+  const date = currentStudyDateStr();
 
   const path = await uploadStudyPhoto(supabase, {
     userId: user.id,
@@ -55,7 +55,7 @@ export async function submitToday(payload: {
     throw new Error("사진/시간/내용을 모두 입력해주세요.");
   }
   const { supabase, user } = await requireUser();
-  const date = todaySeoulDateStr();
+  const date = currentStudyDateStr();
 
   const path = await uploadStudyPhoto(supabase, {
     userId: user.id,
