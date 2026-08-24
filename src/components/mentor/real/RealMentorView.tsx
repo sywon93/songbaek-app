@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
+  CalendarClock,
   ChevronDown,
+  Clock3,
   MessageCircleQuestion,
   Reply,
   Send,
@@ -12,7 +14,9 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { RealTopBar } from "@/components/RealTopBar";
 import { approveToday } from "@/lib/actions/study";
-import type { Database } from "@/lib/supabase/types";
+import { weekdayLabel } from "@/lib/date";
+import { mentoringSlotLabel } from "@/lib/mentoring";
+import type { Database, MentoringTimeSlot, Weekday } from "@/lib/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type StudyRecord = Database["public"]["Tables"]["study_records"]["Row"];
@@ -24,14 +28,29 @@ export interface StudentWithRecord {
   studyPhotoUrl: string | null;
 }
 
+export interface StudentScheduleEntry {
+  profile: Profile;
+  mentoringDay: Weekday;
+  nextSessionDate: string;
+  reservedSlot: MentoringTimeSlot | null;
+}
+
+const WEEKDAY_ORDER: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
+
+function studentAnchorId(studentId: string) {
+  return `student-${studentId}`;
+}
+
 export function RealMentorView({
   mentor,
   students,
   date,
+  scheduleEntries,
 }: {
   mentor: Profile;
   students: StudentWithRecord[];
   date: string;
+  scheduleEntries: StudentScheduleEntry[];
 }) {
   const pendingCount = students.filter((s) => s.record?.status === "submitted").length;
 
@@ -49,6 +68,8 @@ export function RealMentorView({
           </p>
         </div>
 
+        <MentoringScheduleSection entries={scheduleEntries} />
+
         <div className="space-y-2.5">
           {students.map((s) => (
             <ReviewCard key={s.profile.id} entry={s} date={date} />
@@ -64,6 +85,68 @@ export function RealMentorView({
   );
 }
 
+function MentoringScheduleSection({ entries }: { entries: StudentScheduleEntry[] }) {
+  const days = WEEKDAY_ORDER.filter((day) => entries.some((e) => e.mentoringDay === day));
+
+  return (
+    <section className="rounded-2xl border-2 border-white/70 bg-white/85 p-4 shadow-md backdrop-blur">
+      <h2 className="flex items-center gap-1.5 text-base font-bold text-gray-800">
+        <CalendarClock size={16} className="text-violet-500" /> 요일별 상담 신청 명단
+      </h2>
+      <p className="mt-0.5 text-xs text-gray-400">
+        담당 학생의 지정 요일별 다음 상담일 예약 현황이에요. 학생을 누르면 아래 학습 기록으로 이동해요.
+      </p>
+
+      {days.length === 0 && (
+        <p className="mt-3 rounded-xl bg-gray-50 p-3 text-center text-xs text-gray-400">
+          상담 요일이 지정된 담당 학생이 없어요.
+        </p>
+      )}
+
+      <div className="mt-3 space-y-3">
+        {days.map((day) => {
+          const dayEntries = entries.filter((e) => e.mentoringDay === day);
+          const sessionDate = dayEntries[0]?.nextSessionDate;
+          return (
+            <div key={day} className="rounded-xl border border-gray-100 bg-gray-50/60 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-bold text-gray-700">{weekdayLabel(day)}</p>
+                <p className="text-[11px] text-gray-400">{sessionDate} 상담 예정</p>
+              </div>
+              <ul className="space-y-1.5">
+                {dayEntries.map((entry) => (
+                  <li key={entry.profile.id}>
+                    <a
+                      href={`#${studentAnchorId(entry.profile.id)}`}
+                      className="flex min-h-11 items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm shadow-sm active:scale-[0.99]"
+                    >
+                      <span className="flex-1 truncate">
+                        <span className="font-medium text-gray-800">{entry.profile.name}</span>
+                        <span className="ml-1.5 text-xs text-gray-400">
+                          학번 {entry.profile.username ?? "미지정"}
+                        </span>
+                      </span>
+                      {entry.reservedSlot ? (
+                        <span className="flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-600">
+                          <Clock3 size={10} /> {mentoringSlotLabel(entry.reservedSlot)}
+                        </span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-400">
+                          미예약
+                        </span>
+                      )}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function ReviewCard({ entry, date }: { entry: StudentWithRecord; date: string }) {
   const { profile: student, record } = entry;
   const status = record?.status ?? "none";
@@ -72,6 +155,19 @@ function ReviewCard({ entry, date }: { entry: StudentWithRecord; date: string })
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  // 요일별 상담 신청 명단에서 학생을 눌러 이동해 온 경우, 해당 카드를
+  // 자동으로 펼쳐서 바로 학습 기록을 확인/처리할 수 있게 합니다.
+  useEffect(() => {
+    if (!canExpand) return;
+    const hash = `#${studentAnchorId(student.id)}`;
+    const syncFromHash = () => {
+      if (window.location.hash === hash) setExpanded(true);
+    };
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
+    return () => window.removeEventListener("hashchange", syncFromHash);
+  }, [canExpand, student.id]);
 
   const handleApprove = () => {
     if (!record || message.trim().length < 2) return;
@@ -87,7 +183,10 @@ function ReviewCard({ entry, date }: { entry: StudentWithRecord; date: string })
   };
 
   return (
-    <div className="rounded-2xl border-2 border-white/70 bg-white/85 shadow-md backdrop-blur">
+    <div
+      id={studentAnchorId(student.id)}
+      className="scroll-mt-20 rounded-2xl border-2 border-white/70 bg-white/85 shadow-md backdrop-blur"
+    >
       <button
         type="button"
         onClick={() => canExpand && setExpanded((v) => !v)}
