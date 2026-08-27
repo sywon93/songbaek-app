@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   CalendarClock,
+  CalendarSearch,
   ChevronDown,
   Clock3,
+  History,
   MessageCircleQuestion,
   Reply,
   Send,
@@ -41,16 +44,29 @@ function studentAnchorId(studentId: string) {
   return `student-${studentId}`;
 }
 
+function formatDateLabel(dateStr: string) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return dateStr;
+  const wd = ["일", "월", "화", "수", "목", "금", "토"][new Date(y, m - 1, d).getDay()];
+  return `${m}월 ${d}일 (${wd})`;
+}
+
 export function RealMentorView({
   mentor,
   students,
   date,
   scheduleEntries,
+  pastPending,
+  browseDate,
+  browseEntries,
 }: {
   mentor: Profile;
   students: StudentWithRecord[];
   date: string;
   scheduleEntries: StudentScheduleEntry[];
+  pastPending: StudentWithRecord[];
+  browseDate: string | null;
+  browseEntries: StudentWithRecord[];
 }) {
   const pendingCount = students.filter((s) => s.record?.status === "submitted").length;
 
@@ -65,14 +81,22 @@ export function RealMentorView({
           </h1>
           <p className="text-sm text-gray-500">
             승인 대기 {pendingCount}건 / 전체 {students.length}명
+            {pastPending.length > 0 && (
+              <span className="ml-1 font-semibold text-amber-600">
+                · 지난 날짜 밀린 승인 {pastPending.length}건
+              </span>
+            )}
           </p>
         </div>
 
         <MentoringScheduleSection entries={scheduleEntries} />
 
+        <PastPendingSection entries={pastPending} />
+
         <div className="space-y-2.5">
+          <p className="px-1 text-xs font-semibold text-gray-400">오늘 ({formatDateLabel(date)})</p>
           {students.map((s) => (
-            <ReviewCard key={s.profile.id} entry={s} date={date} />
+            <ReviewCard key={s.profile.id} entry={s} approveDate={date} variant="today" />
           ))}
           {students.length === 0 && (
             <p className="rounded-xl bg-gray-50 p-4 text-center text-sm text-gray-400">
@@ -80,6 +104,8 @@ export function RealMentorView({
             </p>
           )}
         </div>
+
+        <DateBrowseSection browseDate={browseDate} entries={browseEntries} today={date} />
       </main>
     </div>
   );
@@ -147,19 +173,110 @@ function MentoringScheduleSection({ entries }: { entries: StudentScheduleEntry[]
   );
 }
 
-function ReviewCard({ entry, date }: { entry: StudentWithRecord; date: string }) {
+function PastPendingSection({ entries }: { entries: StudentWithRecord[] }) {
+  if (entries.length === 0) return null;
+
+  return (
+    <section className="rounded-2xl border-2 border-amber-200 bg-amber-50/80 p-4 shadow-md backdrop-blur">
+      <h2 className="flex items-center gap-1.5 text-base font-bold text-amber-800">
+        <History size={16} className="text-amber-500" /> 밀린 승인 · 지난 날짜 ({entries.length}건)
+      </h2>
+      <p className="mt-0.5 text-xs text-amber-700/80">
+        예전에 학생이 제출했지만 아직 도장을 못 찍은 기록이에요. 지금이라도 확인하고 도장을 찍어줄 수 있어요.
+      </p>
+      <div className="mt-3 space-y-2.5">
+        {entries.map((s) => (
+          <ReviewCard
+            key={s.record?.id ?? s.profile.id}
+            entry={s}
+            approveDate={s.record?.record_date ?? ""}
+            variant="past"
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DateBrowseSection({
+  browseDate,
+  entries,
+  today,
+}: {
+  browseDate: string | null;
+  entries: StudentWithRecord[];
+  today: string;
+}) {
+  const router = useRouter();
+
+  return (
+    <section className="rounded-2xl border-2 border-white/70 bg-white/85 p-4 shadow-md backdrop-blur">
+      <h2 className="flex items-center gap-1.5 text-base font-bold text-gray-800">
+        <CalendarSearch size={16} className="text-violet-500" /> 날짜별 학습 현황 조회
+      </h2>
+      <p className="mt-0.5 text-xs text-gray-400">
+        특정 날짜를 골라 담당 학생 전체의 그날 학습 현황을 확인하고, 승인 대기 중인 기록은 도장을 찍어줄 수 있어요.
+      </p>
+
+      <label className="mt-3 flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3">
+        <span className="shrink-0 text-sm font-medium text-gray-600">조회 날짜</span>
+        <input
+          type="date"
+          max={today}
+          defaultValue={browseDate ?? ""}
+          onChange={(e) => {
+            router.push(e.target.value ? `/mentor?date=${e.target.value}` : "/mentor");
+          }}
+          className="ml-auto min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        />
+      </label>
+
+      {browseDate && (
+        <div className="mt-3 space-y-2.5">
+          <p className="px-1 text-xs font-semibold text-gray-400">{formatDateLabel(browseDate)} 학습 현황</p>
+          {entries.map((s) => (
+            <ReviewCard
+              key={s.profile.id}
+              entry={s}
+              approveDate={browseDate}
+              variant="browse"
+            />
+          ))}
+          {entries.length === 0 && (
+            <p className="rounded-xl bg-gray-50 p-4 text-center text-sm text-gray-400">
+              담당 학생이 없어요.
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ReviewCard({
+  entry,
+  approveDate,
+  variant,
+}: {
+  entry: StudentWithRecord;
+  approveDate: string;
+  variant: "today" | "past" | "browse";
+}) {
   const { profile: student, record } = entry;
   const status = record?.status ?? "none";
-  const canExpand = status === "submitted" || status === "approved";
-  const [expanded, setExpanded] = useState(status === "submitted");
+  const canExpand =
+    variant === "today" ? status === "submitted" || status === "approved" : true;
+  const [expanded, setExpanded] = useState(
+    variant === "past" ? true : status === "submitted",
+  );
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   // 요일별 상담 신청 명단에서 학생을 눌러 이동해 온 경우, 해당 카드를
-  // 자동으로 펼쳐서 바로 학습 기록을 확인/처리할 수 있게 합니다.
+  // 자동으로 펼쳐서 바로 학습 기록을 확인/처리할 수 있게 합니다. (오늘 목록 한정)
   useEffect(() => {
-    if (!canExpand) return;
+    if (variant !== "today" || !canExpand) return;
     const hash = `#${studentAnchorId(student.id)}`;
     const syncFromHash = () => {
       if (window.location.hash === hash) setExpanded(true);
@@ -167,14 +284,14 @@ function ReviewCard({ entry, date }: { entry: StudentWithRecord; date: string })
     syncFromHash();
     window.addEventListener("hashchange", syncFromHash);
     return () => window.removeEventListener("hashchange", syncFromHash);
-  }, [canExpand, student.id]);
+  }, [variant, canExpand, student.id]);
 
   const handleApprove = () => {
-    if (!record || message.trim().length < 2) return;
+    if (!record || message.trim().length < 2 || !approveDate) return;
     setError(null);
     startTransition(async () => {
       try {
-        await approveToday({ studentId: student.id, recordDate: date, message });
+        await approveToday({ studentId: student.id, recordDate: approveDate, message });
         setMessage("");
       } catch (e) {
         setError((e as Error).message);
@@ -182,9 +299,11 @@ function ReviewCard({ entry, date }: { entry: StudentWithRecord; date: string })
     });
   };
 
+  const cardId = variant === "today" ? studentAnchorId(student.id) : undefined;
+
   return (
     <div
-      id={studentAnchorId(student.id)}
+      id={cardId}
       className="scroll-mt-20 rounded-2xl border-2 border-white/70 bg-white/85 shadow-md backdrop-blur"
     >
       <button
@@ -201,42 +320,62 @@ function ReviewCard({ entry, date }: { entry: StudentWithRecord; date: string })
             학번 {student.username ?? "미지정"} · 도장 {student.stamp_count}/{student.stamp_goal}
           </p>
         </div>
+        {variant === "past" && record && (
+          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+            {formatDateLabel(record.record_date)}
+          </span>
+        )}
         <StatusBadge status={status} />
         {canExpand && (
           <ChevronDown size={16} className={`text-gray-400 transition ${expanded ? "rotate-180" : ""}`} />
         )}
       </button>
 
-      {expanded && canExpand && record && (
+      {expanded && canExpand && (
         <div className="space-y-3 border-t border-gray-100 p-3">
-          {record.student_note && (
-            <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-3">
-              <p className="flex items-center gap-1.5 text-xs font-bold text-violet-700">
-                <MessageCircleQuestion size={14} /> 오늘의 한마디 &amp; 질문
-              </p>
-              <p className="mt-1 text-sm text-violet-900">{record.student_note}</p>
-            </div>
+          {!record && (
+            <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-400">
+              이 날짜에는 학생이 남긴 학습 기록이 없어요.
+            </p>
           )}
-          <div className="flex gap-3">
-            {entry.plannerPhotoUrl && (
-              <div className="flex-1">
-                <p className="mb-1 text-[11px] font-medium text-gray-400">플래너</p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={entry.plannerPhotoUrl} alt="플래너 사진" className="h-24 w-full rounded-lg object-cover" />
+          {record && status === "started" && (
+            <p className="rounded-lg bg-blue-50 p-3 text-xs text-blue-600">
+              학습을 시작했지만 아직 마감(공부 인증) 제출을 하지 않았어요.
+            </p>
+          )}
+
+          {record && (status === "submitted" || status === "approved") && (
+            <>
+              {record.student_note && (
+                <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-3">
+                  <p className="flex items-center gap-1.5 text-xs font-bold text-violet-700">
+                    <MessageCircleQuestion size={14} /> 오늘의 한마디 &amp; 질문
+                  </p>
+                  <p className="mt-1 text-sm text-violet-900">{record.student_note}</p>
+                </div>
+              )}
+              <div className="flex gap-3">
+                {entry.plannerPhotoUrl && (
+                  <div className="flex-1">
+                    <p className="mb-1 text-[11px] font-medium text-gray-400">플래너</p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={entry.plannerPhotoUrl} alt="플래너 사진" className="h-24 w-full rounded-lg object-cover" />
+                  </div>
+                )}
+                {entry.studyPhotoUrl && (
+                  <div className="flex-1">
+                    <p className="mb-1 text-[11px] font-medium text-gray-400">공부 인증</p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={entry.studyPhotoUrl} alt="공부 인증 사진" className="h-24 w-full rounded-lg object-cover" />
+                  </div>
+                )}
               </div>
-            )}
-            {entry.studyPhotoUrl && (
-              <div className="flex-1">
-                <p className="mb-1 text-[11px] font-medium text-gray-400">공부 인증</p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={entry.studyPhotoUrl} alt="공부 인증 사진" className="h-24 w-full rounded-lg object-cover" />
+              <div className="rounded-lg bg-gray-50 p-2.5 text-sm">
+                <p className="font-medium text-gray-700">{record.study_minutes ?? 0}분</p>
+                <p className="mt-0.5 text-gray-500">{record.study_content}</p>
               </div>
-            )}
-          </div>
-          <div className="rounded-lg bg-gray-50 p-2.5 text-sm">
-            <p className="font-medium text-gray-700">{record.study_minutes}분</p>
-            <p className="mt-0.5 text-gray-500">{record.study_content}</p>
-          </div>
+            </>
+          )}
 
           {status === "submitted" && (
             <div className="space-y-2">
@@ -258,12 +397,17 @@ function ReviewCard({ entry, date }: { entry: StudentWithRecord; date: string })
                 onClick={handleApprove}
                 className="flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-rose-600 py-3 text-sm font-semibold text-white transition active:scale-[0.99] hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-gray-300"
               >
-                <Stamp size={16} /> {pending ? "승인 중..." : "승인하고 도장 찍어주기"}
+                <Stamp size={16} />{" "}
+                {pending
+                  ? "승인 중..."
+                  : variant === "today"
+                    ? "승인하고 도장 찍어주기"
+                    : `${record ? formatDateLabel(record.record_date) : ""} 도장 찍어주기`}
               </button>
             </div>
           )}
 
-          {status === "approved" && (
+          {status === "approved" && record && (
             <div className="flex items-start gap-2 rounded-lg bg-rose-50 p-2.5 text-sm">
               <Send size={14} className="mt-0.5 shrink-0 text-rose-500" />
               <div>
