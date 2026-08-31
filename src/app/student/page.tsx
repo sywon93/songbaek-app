@@ -35,19 +35,23 @@ export default async function StudentPage() {
     ? nextMentoringDateStr(profile.mentoring_day as Weekday)
     : null;
 
-  const [plannerPhotoUrl, studyPhotoUrl, slotStatusRes, noticesRes] = await Promise.all([
-    getSignedPhotoUrl(supabase, record?.planner_photo_url),
-    getSignedPhotoUrl(supabase, record?.study_photo_url),
-    mentoringDate
-      ? supabase.rpc("mentoring_slot_status", { p_date: mentoringDate })
-      : Promise.resolve({ data: null }),
-    supabase
-      .from("notices")
-      .select("id, title, is_pinned, created_at")
-      .order("is_pinned", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(3),
-  ]);
+  const [plannerPhotoUrl, studyPhotoUrl, slotStatusRes, noticesRes, reviewerRes] =
+    await Promise.all([
+      getSignedPhotoUrl(supabase, record?.planner_photo_url),
+      getSignedPhotoUrl(supabase, record?.study_photo_url),
+      mentoringDate
+        ? supabase.rpc("mentoring_slot_status", { p_date: mentoringDate })
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("notices")
+        .select("id, title, is_pinned, created_at")
+        .order("is_pinned", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(3),
+      record?.reviewed_by
+        ? supabase.from("profiles").select("name").eq("id", record.reviewed_by).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
 
   return (
     <RealStudentView
@@ -58,6 +62,7 @@ export default async function StudentPage() {
       mentoringDate={mentoringDate}
       slotStatus={slotStatusRes.data ?? []}
       notices={noticesRes.data ?? []}
+      reviewerName={reviewerRes.data?.name ?? null}
     />
   );
 }

@@ -46,6 +46,14 @@ export function currentStudyDateStr(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// "YYYY-MM-DD" 학습일 문자열을 "8월 31일 (일)" 형태의 한국어 라벨로 변환합니다.
+export function studyDateLabel(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return dateStr;
+  const wd = ["일", "월", "화", "수", "목", "금", "토"][new Date(y, m - 1, d).getDay()];
+  return `${m}월 ${d}일 (${wd})`;
+}
+
 const WEEKDAY_ORDER: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
 
 const WEEKDAY_LABEL: Record<Weekday, string> = {

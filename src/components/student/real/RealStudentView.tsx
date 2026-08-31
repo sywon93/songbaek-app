@@ -14,6 +14,7 @@ import {
   Megaphone,
   MessageCircle,
   MessageCircleQuestion,
+  NotebookPen,
   Pin,
   PlayCircle,
   RefreshCw,
@@ -66,6 +67,7 @@ export function RealStudentView({
   mentoringDate,
   slotStatus,
   notices,
+  reviewerName,
 }: {
   profile: Profile;
   record: StudyRecord | null;
@@ -74,6 +76,7 @@ export function RealStudentView({
   mentoringDate: string | null;
   slotStatus: SlotStatus[];
   notices: NoticePreview[];
+  reviewerName: string | null;
 }) {
   const { stamp_count: stampCount, stamp_goal: stampGoal, round } = profile;
   const achieved = stampCount >= stampGoal;
@@ -118,6 +121,18 @@ export function RealStudentView({
         )}
 
         <NoticesPreviewSection notices={notices} />
+
+        <Link
+          href="/student/records"
+          className="flex items-center gap-2.5 rounded-2xl border-2 border-white/70 bg-white/85 p-3.5 shadow-md backdrop-blur active:scale-[0.99] sm:p-4"
+        >
+          <NotebookPen size={18} className="shrink-0 text-rose-500" />
+          <div className="flex-1">
+            <p className="text-sm font-bold text-gray-800">내 학습 기록 &amp; 멘토 피드백</p>
+            <p className="text-[11px] text-gray-400">지난 학습 일지와 멘토가 남긴 피드백을 모아봐요</p>
+          </div>
+          <span className="shrink-0 text-[11px] font-medium text-gray-400">전체보기 →</span>
+        </Link>
 
         {/* 도장판 */}
         <section className="rounded-2xl border-2 border-white/70 bg-white/80 p-3 shadow-md backdrop-blur sm:p-4">
@@ -319,7 +334,24 @@ export function RealStudentView({
                   <MessageCircle size={16} className="mt-0.5 shrink-0 text-rose-500" />
                   <div>
                     <p className="text-xs font-semibold text-rose-700">멘토의 답장</p>
-                    <p className="mt-0.5 text-sm text-rose-900">{record.encouragement_message}</p>
+                    <p className="mt-0.5 whitespace-pre-wrap text-sm text-rose-900">
+                      {record.encouragement_message}
+                    </p>
+                    <p className="mt-1 text-[11px] text-rose-400">
+                      {reviewerName
+                        ? `${reviewerName} 멘토`
+                        : record.manual_override
+                          ? "관리자 선생님"
+                          : "담당 멘토"}
+                      {record.reviewed_at
+                        ? ` · ${new Date(record.reviewed_at).toLocaleString("ko-KR", {
+                            month: "long",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}`
+                        : ""}
+                    </p>
                   </div>
                 </div>
               )}
