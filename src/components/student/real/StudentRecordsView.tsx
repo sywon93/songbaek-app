@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { RealTopBar } from "@/components/RealTopBar";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ZoomableImage } from "@/components/ui/ZoomableImage";
 import { studyDateLabel } from "@/lib/date";
 import type { Database } from "@/lib/supabase/types";
 
@@ -163,11 +164,11 @@ export function StudentRecordDetailView({
             {plannerPhotoUrl && (
               <div>
                 <p className="mb-1 text-xs font-semibold text-gray-400">오늘의 계획 (플래너)</p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <ZoomableImage
                   src={plannerPhotoUrl}
                   alt="플래너 사진"
-                  className="max-h-72 w-full rounded-xl object-contain"
+                  caption={`플래너 · ${studyDateLabel(record.record_date)}`}
+                  thumbClassName="max-h-[28rem] w-full object-contain"
                 />
               </div>
             )}
@@ -175,11 +176,11 @@ export function StudentRecordDetailView({
             {studyPhotoUrl && (
               <div>
                 <p className="mb-1 text-xs font-semibold text-gray-400">공부 인증 사진</p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <ZoomableImage
                   src={studyPhotoUrl}
                   alt="공부 인증 사진"
-                  className="max-h-72 w-full rounded-xl object-contain"
+                  caption={`공부 인증 · ${studyDateLabel(record.record_date)}`}
+                  thumbClassName="max-h-[28rem] w-full object-contain"
                 />
               </div>
             )}

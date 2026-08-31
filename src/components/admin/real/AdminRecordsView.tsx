@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RealTopBar } from "@/components/RealTopBar";
+import { ZoomableImage } from "@/components/ui/ZoomableImage";
 import { adminSetStamp } from "@/lib/actions/admin";
 import type { Database } from "@/lib/supabase/types";
 import type { RecordStatus } from "@/lib/mock/types";
@@ -164,19 +165,27 @@ function RecordRow({ entry, date }: { entry: AdminRecordEntry; date: string }) {
                   <p className="mt-1 text-sm text-violet-900">{record.student_note}</p>
                 </div>
               )}
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 {entry.plannerPhotoUrl && (
                   <div className="flex-1">
                     <p className="mb-1 text-[11px] font-medium text-gray-400">플래너</p>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={entry.plannerPhotoUrl} alt="플래너 사진" className="h-24 w-full rounded-lg object-cover" />
+                    <ZoomableImage
+                      src={entry.plannerPhotoUrl}
+                      alt="플래너 사진"
+                      caption={`플래너 · ${student.name} · ${date}`}
+                      thumbClassName="max-h-80 w-full object-contain sm:h-64"
+                    />
                   </div>
                 )}
                 {entry.studyPhotoUrl && (
                   <div className="flex-1">
                     <p className="mb-1 text-[11px] font-medium text-gray-400">공부 인증</p>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={entry.studyPhotoUrl} alt="공부 인증 사진" className="h-24 w-full rounded-lg object-cover" />
+                    <ZoomableImage
+                      src={entry.studyPhotoUrl}
+                      alt="공부 인증 사진"
+                      caption={`공부 인증 · ${student.name} · ${date}`}
+                      thumbClassName="max-h-80 w-full object-contain sm:h-64"
+                    />
                   </div>
                 )}
               </div>
