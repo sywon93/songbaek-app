@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
 import { getSignedPhotoUrl } from "@/lib/supabase/storage";
 import { currentStudyDateStr, nextMentoringDateStr } from "@/lib/date";
+import { HOME_QUERY_TIMEOUT_MS, withTimeout } from "@/lib/async/withTimeout";
 import {
   RealMentorView,
   type StudentScheduleEntry,
@@ -20,23 +21,29 @@ export default async function MentorPage({
   if (!isSupabaseConfigured) redirect("/");
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const userRes = await withTimeout(
+    supabase.auth.getUser(),
+    HOME_QUERY_TIMEOUT_MS,
+    null,
+  );
+  const user = userRes?.data.user ?? null;
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  const profileRes = await withTimeout(
+    supabase.from("profiles").select("*").eq("id", user.id).single(),
+    HOME_QUERY_TIMEOUT_MS,
+    null,
+  );
+  const profile = profileRes?.data ?? null;
   if (!profile) redirect("/login");
   if (profile.role !== "mentor") redirect(`/${profile.role}`);
 
-  const { data: links } = await supabase
-    .from("mentor_student_links")
-    .select("student_id")
-    .eq("mentor_id", user.id);
+  const linksRes = await withTimeout(
+    supabase.from("mentor_student_links").select("student_id").eq("mentor_id", user.id),
+    HOME_QUERY_TIMEOUT_MS,
+    { data: null },
+  );
+  const links = linksRes.data;
   const studentIds = (links ?? []).map((l) => l.student_id);
 
   const date = currentStudyDateStr();
@@ -46,34 +53,58 @@ export default async function MentorPage({
     rawBrowseDate && /^\d{4}-\d{2}-\d{2}$/.test(rawBrowseDate) ? rawBrowseDate : null;
 
   const [studentsRes, recordsRes, pastPendingRes, browseRecordsRes] = await Promise.all([
-    studentIds.length
-      ? supabase.from("profiles").select("*").in("id", studentIds).order("username")
-      : Promise.resolve({ data: [] as (typeof profile)[] }),
-    studentIds.length
-      ? supabase
-          .from("study_records")
-          .select("*")
-          .in("student_id", studentIds)
-          .eq("record_date", date)
-      : Promise.resolve({ data: [] as StudyRecord[] }),
+    withTimeout(
+      Promise.resolve(
+        studentIds.length
+          ? supabase.from("profiles").select("*").in("id", studentIds).order("username")
+          : { data: [] as (typeof profile)[] },
+      ),
+      HOME_QUERY_TIMEOUT_MS,
+      { data: [] as (typeof profile)[] },
+    ),
+    withTimeout(
+      Promise.resolve(
+        studentIds.length
+          ? supabase
+              .from("study_records")
+              .select("*")
+              .in("student_id", studentIds)
+              .eq("record_date", date)
+          : { data: [] as StudyRecord[] },
+      ),
+      HOME_QUERY_TIMEOUT_MS,
+      { data: [] as StudyRecord[] },
+    ),
     // 지난 날짜 중 아직 '승인 대기(submitted)'인 기록 = 멘토가 도장을 못 찍고 넘어간 것들
-    studentIds.length
-      ? supabase
-          .from("study_records")
-          .select("*")
-          .in("student_id", studentIds)
-          .eq("status", "submitted")
-          .lt("record_date", date)
-          .order("record_date", { ascending: false })
-      : Promise.resolve({ data: [] as StudyRecord[] }),
+    withTimeout(
+      Promise.resolve(
+        studentIds.length
+          ? supabase
+              .from("study_records")
+              .select("*")
+              .in("student_id", studentIds)
+              .eq("status", "submitted")
+              .lt("record_date", date)
+              .order("record_date", { ascending: false })
+          : { data: [] as StudyRecord[] },
+      ),
+      HOME_QUERY_TIMEOUT_MS,
+      { data: [] as StudyRecord[] },
+    ),
     // 날짜별 조회: ?date= 로 지정한 특정 날짜의 담당 학생 전체 기록
-    browseDate && studentIds.length
-      ? supabase
-          .from("study_records")
-          .select("*")
-          .in("student_id", studentIds)
-          .eq("record_date", browseDate)
-      : Promise.resolve({ data: [] as StudyRecord[] }),
+    withTimeout(
+      Promise.resolve(
+        browseDate && studentIds.length
+          ? supabase
+              .from("study_records")
+              .select("*")
+              .in("student_id", studentIds)
+              .eq("record_date", browseDate)
+          : { data: [] as StudyRecord[] },
+      ),
+      HOME_QUERY_TIMEOUT_MS,
+      { data: [] as StudyRecord[] },
+    ),
   ]);
 
   const studentProfiles = studentsRes.data ?? [];
@@ -131,10 +162,14 @@ export default async function MentorPage({
   // 추가하며 스키마 변경은 없습니다.)
   const studentsWithDay = studentProfiles.filter((s) => s.mentoring_day);
   const reservationsRes = studentIds.length
-    ? await supabase
-        .from("mentoring_reservations")
-        .select("student_id, session_date, time_slot")
-        .in("student_id", studentIds)
+    ? await withTimeout(
+        supabase
+          .from("mentoring_reservations")
+          .select("student_id, session_date, time_slot")
+          .in("student_id", studentIds),
+        HOME_QUERY_TIMEOUT_MS,
+        { data: null },
+      )
     : { data: [] };
   const reservationByStudentDate = new Map(
     (reservationsRes.data ?? []).map((r) => [`${r.student_id}_${r.session_date}`, r.time_slot]),
