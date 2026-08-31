@@ -28,7 +28,7 @@ import { RealTopBar } from "@/components/RealTopBar";
 import { startNextRound, startToday, submitToday } from "@/lib/actions/study";
 import { cancelMentoringReservation, reserveMentoringSlot } from "@/lib/actions/mentoring";
 import { weekdayLabel } from "@/lib/date";
-import { MENTORING_TIME_SLOTS } from "@/lib/mentoring";
+import { mentoringSlotLabel } from "@/lib/mentoring";
 import type { Database } from "@/lib/supabase/types";
 
 type SlotStatus = Database["public"]["Functions"]["mentoring_slot_status"]["Returns"][number];
@@ -417,35 +417,46 @@ function MentoringReservationSection({
             <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-500">{error}</p>
           )}
 
-          <div className="grid grid-cols-2 gap-2">
-            {MENTORING_TIME_SLOTS.map((slot) => {
-              const status = slotStatus.find((s) => s.time_slot === slot.id);
-              const isTaken = status?.is_taken ?? false;
-              const isMine = status?.is_mine ?? false;
-              const disabled = pending || (isTaken && !isMine) || (mine !== undefined && !isMine);
+          {slotStatus.length === 0 ? (
+            <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-400">
+              아직 예약 가능한 시간대가 없어요. 담당 멘토·요일이 배정되면 나타나요.
+            </p>
+          ) : (
+            <>
+              <p className="text-[11px] text-gray-400">
+                이번 세션은 {slotStatus.length}타임제예요. (인원수에 맞춰 휴식시간이 반영됩니다)
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {slotStatus.map((slot, i) => {
+                  const isTaken = slot.is_taken;
+                  const isMine = slot.is_mine;
+                  const disabled = pending || (isTaken && !isMine) || (mine !== undefined && !isMine);
 
-              return (
-                <button
-                  key={slot.id}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => run(() => reserveMentoringSlot(slot.id))}
-                  className={`min-h-14 rounded-xl border-2 px-2 py-2.5 text-center text-sm font-semibold transition ${
-                    isMine
-                      ? "border-rose-400 bg-rose-50 text-rose-600"
-                      : isTaken
-                        ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300"
-                        : "border-gray-200 bg-white text-gray-700 hover:border-rose-300 active:scale-[0.99] disabled:opacity-60"
-                  }`}
-                >
-                  {slot.label}
-                  <span className="mt-0.5 block text-[11px] font-medium">
-                    {isMine ? "내 예약" : isTaken ? "마감" : "예약 가능"}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  return (
+                    <button
+                      key={`${slot.time_slot}-${i}`}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => run(() => reserveMentoringSlot(slot.time_slot))}
+                      className={`min-h-14 rounded-xl border-2 px-2 py-2.5 text-center text-sm font-semibold transition ${
+                        isMine
+                          ? "border-rose-400 bg-rose-50 text-rose-600"
+                          : isTaken
+                            ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300"
+                            : "border-gray-200 bg-white text-gray-700 hover:border-rose-300 active:scale-[0.99] disabled:opacity-60"
+                      }`}
+                    >
+                      <span className="block text-[11px] font-bold text-gray-400">{i + 1}타임</span>
+                      {mentoringSlotLabel(slot.time_slot)}
+                      <span className="mt-0.5 block text-[11px] font-medium">
+                        {isMine ? "내 예약" : isTaken ? "마감" : "예약 가능"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           {mine?.reservation_id && (
             <button

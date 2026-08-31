@@ -5,7 +5,19 @@
 export type UserRole = "student" | "mentor" | "admin";
 export type SubmissionStatus = "started" | "submitted" | "approved";
 export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri";
-export type MentoringTimeSlot = "slot_1840" | "slot_1915" | "slot_1950" | "slot_2025";
+export type MentoringTimeSlot =
+  // 멘티 4명 기준 (기존)
+  | "slot_1840"
+  | "slot_1915"
+  | "slot_1950"
+  | "slot_2025"
+  // 멘티 3명 기준 (50분 진행 + 10분 휴식)
+  | "slot_1800_1850"
+  | "slot_1900_1950"
+  | "slot_2000_2050"
+  // 멘티 5명 기준 (30분 진행 + 5/10분 휴식, 뒤 3개는 위 값 재사용)
+  | "slot_1800_1830"
+  | "slot_1835_1905";
 
 export interface Database {
   public: {

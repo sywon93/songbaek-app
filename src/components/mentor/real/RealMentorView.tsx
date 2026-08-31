@@ -19,7 +19,7 @@ import { RealTopBar } from "@/components/RealTopBar";
 import { ZoomableImage } from "@/components/ui/ZoomableImage";
 import { approveToday } from "@/lib/actions/study";
 import { weekdayLabel } from "@/lib/date";
-import { mentoringSlotLabel } from "@/lib/mentoring";
+import { mentoringSlotLabel, mentoringSlotsForCount } from "@/lib/mentoring";
 import type { Database, MentoringTimeSlot, Weekday } from "@/lib/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -134,12 +134,21 @@ function MentoringScheduleSection({ entries }: { entries: StudentScheduleEntry[]
         {days.map((day) => {
           const dayEntries = entries.filter((e) => e.mentoringDay === day);
           const sessionDate = dayEntries[0]?.nextSessionDate;
+          const slots = mentoringSlotsForCount(dayEntries.length);
           return (
             <div key={day} className="rounded-xl border border-gray-100 bg-gray-50/60 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-bold text-gray-700">{weekdayLabel(day)}</p>
+              <div className="mb-1 flex items-center justify-between">
+                <p className="text-sm font-bold text-gray-700">
+                  {weekdayLabel(day)}
+                  <span className="ml-1.5 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-500">
+                    {dayEntries.length}명 · {slots.length}타임제
+                  </span>
+                </p>
                 <p className="text-[11px] text-gray-400">{sessionDate} 상담 예정</p>
               </div>
+              <p className="mb-2 text-[11px] text-gray-400">
+                {slots.map((s) => mentoringSlotLabel(s)).join(" / ")}
+              </p>
               <ul className="space-y-1.5">
                 {dayEntries.map((entry) => (
                   <li key={entry.profile.id}>
