@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, Megaphone, Pin } from "lucide-react";
 import { RealTopBar } from "@/components/RealTopBar";
+import { formatSeoulDate } from "@/lib/date";
 import type { Database } from "@/lib/supabase/types";
 
 type Notice = Pick<
@@ -47,7 +48,7 @@ export function StudentNoticesListView({
               )}
               <span className="flex-1 truncate text-sm font-semibold text-gray-800">{n.title}</span>
               <span className="shrink-0 text-[11px] text-gray-400">
-                {new Date(n.created_at).toLocaleDateString("ko-KR")}
+                {formatSeoulDate(n.created_at)}
               </span>
             </Link>
           ))}
@@ -86,7 +87,7 @@ export function StudentNoticeDetailView({
               </span>
             )}
             <span className="text-[11px] text-gray-400">
-              {new Date(notice.created_at).toLocaleDateString("ko-KR")}
+              {formatSeoulDate(notice.created_at)}
             </span>
           </div>
           <h1 className="text-lg font-bold text-gray-800">{notice.title}</h1>

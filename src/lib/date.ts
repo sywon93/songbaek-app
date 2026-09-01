@@ -46,6 +46,30 @@ export function currentStudyDateStr(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// 타임스탬프(ISO 문자열)를 Asia/Seoul 기준으로 "9월 1일 오후 02:30" 형태로 포맷합니다.
+// timeZone 을 고정하지 않으면 서버(UTC)와 브라우저(사용자 로컬)의 렌더 결과가 달라
+// React 하이드레이션 불일치 경고가 발생하므로, 표시용 시각 포맷은 항상 이 함수를 씁니다.
+export function formatSeoulDateTime(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// 타임스탬프를 Asia/Seoul 기준 날짜만 "2026. 9. 1." 형태로 포맷합니다. (위와 동일한 이유)
+export function formatSeoulDate(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+}
+
 // "YYYY-MM-DD" 학습일 문자열을 "8월 31일 (일)" 형태의 한국어 라벨로 변환합니다.
 export function studyDateLabel(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);

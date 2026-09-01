@@ -6,6 +6,7 @@ import { ArrowLeft, Megaphone, Pencil, Pin, Plus, Trash2 } from "lucide-react";
 import { RealTopBar } from "@/components/RealTopBar";
 import { Modal } from "@/components/ui/Modal";
 import { createNotice, deleteNotice, updateNotice } from "@/lib/actions/notices";
+import { formatSeoulDate } from "@/lib/date";
 import type { Database } from "@/lib/supabase/types";
 
 type Notice = Database["public"]["Tables"]["notices"]["Row"];
@@ -72,7 +73,7 @@ function NoticeRow({ notice, onEdit }: { notice: Notice; onEdit: () => void }) {
           </div>
           <p className="mt-1 line-clamp-2 text-xs text-gray-500">{notice.content}</p>
           <p className="mt-1 text-[11px] text-gray-400">
-            {new Date(notice.created_at).toLocaleDateString("ko-KR")}
+            {formatSeoulDate(notice.created_at)}
           </p>
         </div>
         <div className="flex shrink-0 gap-1">

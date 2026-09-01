@@ -13,23 +13,13 @@ import {
 import { RealTopBar } from "@/components/RealTopBar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ZoomableImage } from "@/components/ui/ZoomableImage";
-import { studyDateLabel } from "@/lib/date";
+import { formatSeoulDateTime, studyDateLabel } from "@/lib/date";
 import type { Database } from "@/lib/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type StudyRecord = Database["public"]["Tables"]["study_records"]["Row"];
 
-function formatDateTime(value: string | null): string | null {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString("ko-KR", {
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const formatDateTime = formatSeoulDateTime;
 
 export function StudentRecordsListView({
   profile,

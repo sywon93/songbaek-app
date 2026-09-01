@@ -27,7 +27,7 @@ import { PhotoUploader } from "@/components/ui/PhotoUploader";
 import { RealTopBar } from "@/components/RealTopBar";
 import { startNextRound, startToday, submitToday } from "@/lib/actions/study";
 import { cancelMentoringReservation, reserveMentoringSlot } from "@/lib/actions/mentoring";
-import { weekdayLabel } from "@/lib/date";
+import { formatSeoulDateTime, weekdayLabel } from "@/lib/date";
 import { mentoringSlotLabel } from "@/lib/mentoring";
 import type { Database } from "@/lib/supabase/types";
 
@@ -74,8 +74,8 @@ export function RealStudentView({
   plannerPhotoUrl: string | null;
   studyPhotoUrl: string | null;
   mentoringDate: string | null;
-  slotStatus: SlotStatus[];
-  notices: NoticePreview[];
+  slotStatus: SlotStatus[] | null | undefined;
+  notices: NoticePreview[] | null | undefined;
   reviewerName: string | null;
 }) {
   const { stamp_count: stampCount, stamp_goal: stampGoal, round } = profile;
@@ -344,12 +344,7 @@ export function RealStudentView({
                           ? "관리자 선생님"
                           : "담당 멘토"}
                       {record.reviewed_at
-                        ? ` · ${new Date(record.reviewed_at).toLocaleString("ko-KR", {
-                            month: "long",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}`
+                        ? ` · ${formatSeoulDateTime(record.reviewed_at) ?? ""}`
                         : ""}
                     </p>
                   </div>
@@ -376,7 +371,7 @@ function MentoringReservationSection({
 }: {
   mentoringDay: Profile["mentoring_day"];
   mentoringDate: string | null;
-  slotStatus: SlotStatus[];
+  slotStatus: SlotStatus[] | null | undefined;
 }) {
   const [pending, startTransitionFn] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -392,7 +387,11 @@ function MentoringReservationSection({
     });
   };
 
-  const mine = slotStatus.find((s) => s.is_mine);
+  // slotStatus 는 서버 RPC(mentoring_slot_status) 결과를 그대로 받는데, 조회가
+  // 실패/타임아웃하면 null 이 올 수 있고 예상치 못한 형태(객체 등)일 가능성도
+  // 있으므로, 렌더 중 .map/.find 가 터지지 않도록 항상 배열로 정규화합니다.
+  const slots: SlotStatus[] = Array.isArray(slotStatus) ? slotStatus : [];
+  const mine = slots.find((s) => s.is_mine);
 
   return (
     <section className="rounded-2xl border-2 border-white/70 bg-white/85 p-3 shadow-md backdrop-blur sm:p-4">
@@ -417,17 +416,17 @@ function MentoringReservationSection({
             <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-500">{error}</p>
           )}
 
-          {slotStatus.length === 0 ? (
+          {slots.length === 0 ? (
             <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-400">
               아직 예약 가능한 시간대가 없어요. 담당 멘토·요일이 배정되면 나타나요.
             </p>
           ) : (
             <>
               <p className="text-[11px] text-gray-400">
-                이번 세션은 {slotStatus.length}타임제예요. (인원수에 맞춰 휴식시간이 반영됩니다)
+                이번 세션은 {slots.length}타임제예요. (인원수에 맞춰 휴식시간이 반영됩니다)
               </p>
               <div className="grid grid-cols-2 gap-2">
-                {slotStatus.map((slot, i) => {
+                {slots.map((slot, i) => {
                   const isTaken = slot.is_taken;
                   const isMine = slot.is_mine;
                   const disabled = pending || (isTaken && !isMine) || (mine !== undefined && !isMine);
@@ -474,8 +473,13 @@ function MentoringReservationSection({
   );
 }
 
-function NoticesPreviewSection({ notices }: { notices: NoticePreview[] }) {
-  if (notices.length === 0) return null;
+function NoticesPreviewSection({
+  notices,
+}: {
+  notices: NoticePreview[] | null | undefined;
+}) {
+  const list = Array.isArray(notices) ? notices : [];
+  if (list.length === 0) return null;
   return (
     <Link
       href="/student/notices"
@@ -488,7 +492,7 @@ function NoticesPreviewSection({ notices }: { notices: NoticePreview[] }) {
         <span className="text-[11px] font-medium text-gray-400">전체보기 →</span>
       </div>
       <ul className="space-y-1">
-        {notices.map((n) => (
+        {list.map((n) => (
           <li key={n.id} className="flex items-center gap-1.5 truncate text-xs text-gray-600">
             {n.is_pinned && <Pin size={11} className="shrink-0 text-rose-400" />}
             <span className="truncate">{n.title}</span>
