@@ -36,7 +36,11 @@ export async function reserveMentoringSlot(timeSlot: MentoringTimeSlot) {
 
   if (error) {
     if (error.code === "23505") {
-      if (error.message.includes("mentoring_reservations_slot_unique")) {
+      // 슬롯 중복(멘토별 정원 마감). 구/신 제약 이름 모두 대비.
+      if (
+        error.message.includes("mentoring_reservations_mentor_slot_unique") ||
+        error.message.includes("mentoring_reservations_slot_unique")
+      ) {
         throw new Error("이미 마감된 시간이에요. 다른 시간을 선택해주세요.");
       }
       throw new Error("이번 회차 멘토링은 이미 예약했어요.");

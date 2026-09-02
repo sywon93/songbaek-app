@@ -140,6 +140,7 @@ export interface Database {
         Row: {
           id: string;
           student_id: string;
+          mentor_id: string;
           session_date: string;
           time_slot: MentoringTimeSlot;
           created_at: string;
@@ -147,6 +148,8 @@ export interface Database {
         Insert: {
           id?: string;
           student_id: string;
+          // 트리거(check_mentoring_reservation)가 자동으로 채우므로 클라이언트는 보내지 않음
+          mentor_id?: string;
           session_date: string;
           time_slot: MentoringTimeSlot;
         };
@@ -206,6 +209,14 @@ export interface Database {
           is_mine: boolean;
           reservation_id: string | null;
         }[];
+      };
+      mentoring_session_size: {
+        Args: { p_student: string };
+        Returns: number;
+      };
+      mentoring_slots_for_count: {
+        Args: { p_count: number };
+        Returns: MentoringTimeSlot[];
       };
       admin_set_stamp: {
         Args: {
