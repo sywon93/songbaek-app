@@ -26,9 +26,14 @@ import { Modal } from "@/components/ui/Modal";
 import { PhotoUploader } from "@/components/ui/PhotoUploader";
 import { RealTopBar } from "@/components/RealTopBar";
 import { startNextRound, startToday, submitToday } from "@/lib/actions/study";
-import { cancelMentoringReservation, reserveMentoringSlot } from "@/lib/actions/mentoring";
+import {
+  cancelMentoringReservation,
+  reserveMentoringSlot,
+  type ActionResult,
+} from "@/lib/actions/mentoring";
 import { formatSeoulDateTime, weekdayLabel } from "@/lib/date";
 import { mentoringSlotLabel } from "@/lib/mentoring";
+import { Toast, friendlyErrorMessage, type ToastMessage } from "@/components/ui/Toast";
 import type { Database } from "@/lib/supabase/types";
 
 type SlotStatus = Database["public"]["Functions"]["mentoring_slot_status"]["Returns"][number];
@@ -95,7 +100,7 @@ export function RealStudentView({
       try {
         await fn();
       } catch (e) {
-        setError((e as Error).message);
+        setError(friendlyErrorMessage(e));
       }
     });
   };
@@ -374,15 +379,20 @@ function MentoringReservationSection({
   slotStatus: SlotStatus[] | null | undefined;
 }) {
   const [pending, startTransitionFn] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
-  const run = (fn: () => Promise<void>) => {
-    setError(null);
+  const run = (fn: () => Promise<ActionResult>, successText?: string) => {
+    setToast(null);
     startTransitionFn(async () => {
       try {
-        await fn();
+        const res = await fn();
+        if (!res.ok) {
+          setToast({ text: res.message, variant: "error" });
+        } else if (successText) {
+          setToast({ text: successText, variant: "success" });
+        }
       } catch (e) {
-        setError((e as Error).message);
+        setToast({ text: friendlyErrorMessage(e), variant: "error" });
       }
     });
   };
@@ -412,10 +422,6 @@ function MentoringReservationSection({
             <span className="font-semibold text-gray-700">{mentoringDate}</span>
           </p>
 
-          {error && (
-            <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-500">{error}</p>
-          )}
-
           {slots.length === 0 ? (
             <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-400">
               아직 예약 가능한 시간대가 없어요. 담당 멘토·요일이 배정되면 나타나요.
@@ -436,7 +442,7 @@ function MentoringReservationSection({
                       key={`${slot.time_slot}-${i}`}
                       type="button"
                       disabled={disabled}
-                      onClick={() => run(() => reserveMentoringSlot(slot.time_slot))}
+                      onClick={() => run(() => reserveMentoringSlot(slot.time_slot), "예약했어요! 🎉")}
                       className={`min-h-14 rounded-xl border-2 px-2 py-2.5 text-center text-sm font-semibold transition ${
                         isMine
                           ? "border-rose-400 bg-rose-50 text-rose-600"
@@ -461,7 +467,7 @@ function MentoringReservationSection({
             <button
               type="button"
               disabled={pending}
-              onClick={() => run(() => cancelMentoringReservation(mine.reservation_id!))}
+              onClick={() => run(() => cancelMentoringReservation(mine.reservation_id!), "예약을 취소했어요.")}
               className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border border-gray-200 bg-white py-2.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 disabled:opacity-60"
             >
               <X size={12} /> 예약 취소
@@ -469,6 +475,8 @@ function MentoringReservationSection({
           )}
         </div>
       )}
+
+      <Toast message={toast} onClose={() => setToast(null)} />
     </section>
   );
 }
