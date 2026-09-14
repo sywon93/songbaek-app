@@ -227,6 +227,10 @@ export interface Database {
         };
         Returns: Database["public"]["Tables"]["study_records"]["Row"];
       };
+      recompute_stamp_count: {
+        Args: { p_student: string };
+        Returns: Database["public"]["Tables"]["profiles"]["Row"];
+      };
     };
     Enums: {
       user_role: UserRole;

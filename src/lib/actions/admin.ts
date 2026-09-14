@@ -186,6 +186,17 @@ export async function assignMentoringDay(studentId: string, day: Weekday | "") {
   revalidatePath("/admin");
 }
 
+export async function recomputeStampCount(studentId: string) {
+  const { supabase } = await requireAdmin();
+  const { error } = await supabase.rpc("recompute_stamp_count", {
+    p_student: studentId,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/records");
+  revalidatePath("/mentor");
+  revalidatePath("/student");
+}
+
 export async function adminSetStamp(payload: {
   studentId: string;
   date: string;
