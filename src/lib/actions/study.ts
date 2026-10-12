@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { uploadStudyPhoto } from "@/lib/supabase/storage";
 import { currentStudyDateStr } from "@/lib/date";
 import { OK, fail, type ActionResult } from "@/lib/actions/result";
+import type { Database } from "@/lib/supabase/types";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -141,10 +142,32 @@ export async function approveToday(payload: {
   revalidatePath("/student");
 }
 
-// 멘토가 승인(일지) 경로 없이 자율적으로 멘티에게 도장을 1개 선물합니다.
+export type GiftSearchStudent =
+  Database["public"]["Functions"]["search_students_for_gift"]["Returns"][number];
+
+export type GiftSearchResult =
+  | { ok: true; students: GiftSearchStudent[] }
+  | { ok: false; message: string };
+
+// 도장 선물 대상 검색: 담당 여부와 무관하게 전체 학생 중 이름/학번 부분 일치.
+// 멘토는 RLS 상 담당이 아닌 학생 프로필을 직접 읽을 수 없어 전용 RPC 를 거칩니다.
+export async function searchStudentsForGift(query: string): Promise<GiftSearchResult> {
+  const q = query.trim();
+  if (!q) return { ok: true, students: [] };
+
+  const { supabase, user } = await getUser();
+  if (!user) return { ok: false, message: "로그인이 필요해요. 다시 로그인해주세요." };
+
+  const { data, error } = await supabase.rpc("search_students_for_gift", { p_query: q });
+  if (error) return { ok: false, message: error.message || "학생 검색에 실패했어요." };
+  return { ok: true, students: data ?? [] };
+}
+
+// 멘토가 승인(일지) 경로 없이 자율적으로 학생에게 도장을 1개 선물합니다.
+// 담당 멘티가 아니어도 멘토/관리자면 누구에게나 줄 수 있습니다.
 // DB RPC(mentor_award_free_stamp)가 권한 검증 · 동시성 잠금 · 회차 자동
 // 처리 · 이력 기록을 전부 담당하므로, 여기서는 입력값만 다듬어 전달합니다.
-// 실패 사유(담당 멘티가 아님 등)를 학생/멘토가 그대로 볼 수 있어야 하므로
+// 실패 사유(멘토 권한 없음 등)를 학생/멘토가 그대로 볼 수 있어야 하므로
 // throw 대신 ActionResult 를 돌려줍니다.
 export async function awardFreeStamp(payload: {
   studentId: string;

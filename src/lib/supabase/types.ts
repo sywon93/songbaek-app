@@ -195,6 +195,17 @@ export interface Database {
         Args: { p_student: string; p_reason: string };
         Returns: Database["public"]["Tables"]["profiles"]["Row"];
       };
+      search_students_for_gift: {
+        Args: { p_query: string };
+        Returns: {
+          id: string;
+          name: string;
+          username: string | null;
+          stamp_count: number;
+          stamp_goal: number;
+          round: number;
+        }[];
+      };
       admin_set_stamp: {
         Args: {
           p_student: string;

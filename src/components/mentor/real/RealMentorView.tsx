@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarSearch,
@@ -9,6 +9,7 @@ import {
   History,
   MessageCircleQuestion,
   Reply,
+  Search,
   Send,
   Stamp,
   Users2,
@@ -18,7 +19,12 @@ import { RealTopBar } from "@/components/RealTopBar";
 import { Modal } from "@/components/ui/Modal";
 import { Toast, friendlyErrorMessage, type ToastMessage } from "@/components/ui/Toast";
 import { ZoomableImage } from "@/components/ui/ZoomableImage";
-import { approveToday, awardFreeStamp } from "@/lib/actions/study";
+import {
+  approveToday,
+  awardFreeStamp,
+  searchStudentsForGift,
+  type GiftSearchStudent,
+} from "@/lib/actions/study";
 import type { Database } from "@/lib/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -77,6 +83,8 @@ export function RealMentorView({
             )}
           </p>
         </div>
+
+        <GiftAnyStudentSection />
 
         <PastPendingSection entries={pastPending} />
 
@@ -365,14 +373,27 @@ function ReviewCard({
   );
 }
 
-// 일지 승인과 무관하게, 멘토가 사유를 적어 멘티에게 도장을 1개 자유롭게
-// 선물하는 버튼 + 모달. 예약 인원 제한 같은 경쟁 조건이 없어 멘티 수가
-// 늘어나도 안전하게 동작합니다.
-function GiftStampButton({ studentId, studentName }: { studentId: string; studentName: string }) {
-  const [open, setOpen] = useState(false);
+// 사유 입력 + 선물 실행 폼. 담당 멘티 카드의 버튼과 전체 학생 검색 모달이
+// 함께 사용합니다. 선물에 성공하면 onDone 을 호출합니다.
+function GiftReasonForm({
+  studentId,
+  studentName,
+  onDone,
+  onToast,
+  onPendingChange,
+}: {
+  studentId: string;
+  studentName: string;
+  onDone: () => void;
+  onToast: (t: ToastMessage) => void;
+  onPendingChange?: (pending: boolean) => void;
+}) {
   const [reason, setReason] = useState("");
   const [pending, startTransition] = useTransition();
-  const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [pending, onPendingChange]);
 
   const canSubmit = reason.trim().length >= 2 && !pending;
 
@@ -382,17 +403,47 @@ function GiftStampButton({ studentId, studentName }: { studentId: string; studen
       try {
         const res = await awardFreeStamp({ studentId, reason });
         if (!res.ok) {
-          setToast({ text: res.message, variant: "error" });
+          onToast({ text: res.message, variant: "error" });
           return;
         }
-        setToast({ text: `${studentName}님에게 도장을 선물했어요! 🎁`, variant: "success" });
+        onToast({ text: `${studentName}님에게 도장을 선물했어요! 🎁`, variant: "success" });
         setReason("");
-        setOpen(false);
+        onDone();
       } catch (e) {
-        setToast({ text: friendlyErrorMessage(e), variant: "error" });
+        onToast({ text: friendlyErrorMessage(e), variant: "error" });
       }
     });
   };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-gray-400">
+        일지 승인과 별개로 도장을 바로 1개 지급해요. 어떤 점이 좋았는지 짧게 남겨주세요.
+      </p>
+      <textarea
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        rows={2}
+        placeholder="예) 숙제 우수 / 태도 좋음 / 질문을 적극적으로 함"
+        className="w-full resize-none rounded-lg border border-gray-300 px-3 py-3 text-base focus:border-amber-400 focus:outline-none"
+      />
+      <button
+        type="button"
+        disabled={!canSubmit}
+        onClick={handleGift}
+        className="flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 py-3 text-sm font-semibold text-white transition active:scale-[0.99] hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-gray-300"
+      >
+        <Gift size={16} /> {pending ? "선물하는 중..." : "도장 선물하기"}
+      </button>
+    </div>
+  );
+}
+
+// 담당 멘티 카드 옆의 [🎁 도장 선물하기] 버튼 + 모달.
+function GiftStampButton({ studentId, studentName }: { studentId: string; studentName: string }) {
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   return (
     <>
@@ -409,28 +460,188 @@ function GiftStampButton({ studentId, studentName }: { studentId: string; studen
           <h3 className="flex items-center gap-1.5 text-base font-bold text-gray-800">
             <Gift size={18} className="text-amber-500" /> {studentName}님에게 도장 선물하기
           </h3>
-          <p className="text-xs text-gray-400">
-            일지 승인과 별개로 도장을 바로 1개 지급해요. 어떤 점이 좋았는지 짧게 남겨주세요.
-          </p>
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={2}
-            placeholder="예) 숙제 우수 / 태도 좋음 / 질문을 적극적으로 함"
-            className="w-full resize-none rounded-lg border border-gray-300 px-3 py-3 text-base focus:border-amber-400 focus:outline-none"
+          <GiftReasonForm
+            studentId={studentId}
+            studentName={studentName}
+            onDone={() => setOpen(false)}
+            onToast={setToast}
+            onPendingChange={setPending}
           />
-          <button
-            type="button"
-            disabled={!canSubmit}
-            onClick={handleGift}
-            className="flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 py-3 text-sm font-semibold text-white transition active:scale-[0.99] hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-gray-300"
-          >
-            <Gift size={16} /> {pending ? "선물하는 중..." : "도장 선물하기"}
-          </button>
         </div>
       </Modal>
 
       <Toast message={toast} onClose={() => setToast(null)} />
     </>
+  );
+}
+
+// 담당 여부와 상관없이 전체 학생을 이름/학번으로 검색해 도장을 선물하는 영역.
+function GiftAnyStudentSection() {
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  return (
+    <section className="rounded-2xl border-2 border-amber-200 bg-amber-50/80 p-4 shadow-md backdrop-blur">
+      <h2 className="flex items-center gap-1.5 text-base font-bold text-amber-800">
+        <Gift size={16} className="text-amber-500" /> 전체 학생 검색 · 도장 선물
+      </h2>
+      <p className="mt-0.5 text-xs text-amber-700/80">
+        담당이 아닌 학생도 이름이나 학번으로 찾아 도장을 선물할 수 있어요.
+      </p>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-3 flex min-h-11 w-full items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 text-left text-sm text-gray-400 hover:bg-amber-50"
+      >
+        <Search size={16} className="text-amber-500" /> 학생 이름 또는 학번으로 검색
+      </button>
+
+      <Modal open={open} onClose={() => !pending && setOpen(false)}>
+        {/* 모달을 열 때마다 검색어/선택 상태를 초기화하려고 open 이 true 일 때만 마운트 */}
+        {open && (
+          <StudentGiftSearch
+            onDone={() => setOpen(false)}
+            onToast={setToast}
+            onPendingChange={setPending}
+          />
+        )}
+      </Modal>
+
+      <Toast message={toast} onClose={() => setToast(null)} />
+    </section>
+  );
+}
+
+const GIFT_SEARCH_LIMIT = 20;
+
+function StudentGiftSearch({
+  onDone,
+  onToast,
+  onPendingChange,
+}: {
+  onDone: () => void;
+  onToast: (t: ToastMessage) => void;
+  onPendingChange: (pending: boolean) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<GiftSearchStudent[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<GiftSearchStudent | null>(null);
+  // 느린 응답이 늦게 도착해 최신 검색 결과를 덮어쓰지 않도록 요청 번호를 둡니다.
+  const requestSeq = useRef(0);
+
+  const handleQueryChange = (value: string) => {
+    setQuery(value);
+    const empty = value.trim() === "";
+    setSearching(!empty);
+    if (empty) {
+      requestSeq.current++;
+      setResults([]);
+      setError(null);
+    }
+  };
+
+  // 입력이 300ms 멈추면 검색합니다.
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) return;
+    const seq = ++requestSeq.current;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await searchStudentsForGift(q);
+        if (seq !== requestSeq.current) return;
+        if (res.ok) {
+          setResults(res.students);
+          setError(null);
+        } else {
+          setResults([]);
+          setError(res.message);
+        }
+      } catch (e) {
+        if (seq === requestSeq.current) setError(friendlyErrorMessage(e));
+      } finally {
+        if (seq === requestSeq.current) setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  if (selected) {
+    return (
+      <div className="space-y-3">
+        <h3 className="flex items-center gap-1.5 text-base font-bold text-gray-800">
+          <Gift size={18} className="text-amber-500" /> {selected.name}님에게 도장 선물하기
+        </h3>
+        <p className="text-xs text-gray-500">
+          학번 {selected.username ?? "미지정"} · 현재 도장 {selected.stamp_count}/{selected.stamp_goal}
+        </p>
+        <GiftReasonForm
+          studentId={selected.id}
+          studentName={selected.name}
+          onDone={onDone}
+          onToast={onToast}
+          onPendingChange={onPendingChange}
+        />
+        <button
+          type="button"
+          onClick={() => setSelected(null)}
+          className="w-full py-1 text-xs font-medium text-gray-400 hover:text-gray-600"
+        >
+          ← 다른 학생 고르기
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <h3 className="flex items-center gap-1.5 text-base font-bold text-gray-800">
+        <Search size={18} className="text-amber-500" /> 도장 선물할 학생 찾기
+      </h3>
+      <input
+        type="search"
+        autoFocus
+        value={query}
+        onChange={(e) => handleQueryChange(e.target.value)}
+        placeholder="이름 또는 학번"
+        className="min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:border-amber-400 focus:outline-none"
+      />
+      <div className="max-h-72 space-y-1.5 overflow-y-auto">
+        {searching && <p className="py-3 text-center text-xs text-gray-400">검색 중...</p>}
+        {!searching && error && (
+          <p className="py-3 text-center text-xs font-medium text-red-500">{error}</p>
+        )}
+        {!searching && !error && query.trim() && results.length === 0 && (
+          <p className="py-3 text-center text-xs text-gray-400">일치하는 학생이 없어요.</p>
+        )}
+        {!searching &&
+          results.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setSelected(s)}
+              className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-left hover:border-amber-300 hover:bg-amber-50"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-bold text-rose-600">
+                {s.name.slice(0, 1)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-800">{s.name}</p>
+                <p className="text-xs text-gray-400">
+                  학번 {s.username ?? "미지정"} · 도장 {s.stamp_count}/{s.stamp_goal}
+                </p>
+              </div>
+              <Gift size={16} className="shrink-0 text-amber-500" />
+            </button>
+          ))}
+        {!searching && results.length === GIFT_SEARCH_LIMIT && (
+          <p className="pt-1 text-center text-[11px] text-gray-400">
+            최대 {GIFT_SEARCH_LIMIT}명까지 보여줘요. 이름을 더 정확히 입력해보세요.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
