@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { uploadStudyPhoto } from "@/lib/supabase/storage";
 import { currentStudyDateStr } from "@/lib/date";
+import { OK, fail, type ActionResult } from "@/lib/actions/result";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -11,6 +12,14 @@ async function requireUser() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("로그인이 필요해요.");
+  return { supabase, user };
+}
+
+async function getUser() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   return { supabase, user };
 }
 
@@ -130,4 +139,35 @@ export async function approveToday(payload: {
   }
   revalidatePath("/mentor");
   revalidatePath("/student");
+}
+
+// 멘토가 승인(일지) 경로 없이 자율적으로 멘티에게 도장을 1개 선물합니다.
+// DB RPC(mentor_award_free_stamp)가 권한 검증 · 동시성 잠금 · 회차 자동
+// 처리 · 이력 기록을 전부 담당하므로, 여기서는 입력값만 다듬어 전달합니다.
+// 실패 사유(담당 멘티가 아님 등)를 학생/멘토가 그대로 볼 수 있어야 하므로
+// throw 대신 ActionResult 를 돌려줍니다.
+export async function awardFreeStamp(payload: {
+  studentId: string;
+  reason: string;
+}): Promise<ActionResult> {
+  const reason = payload.reason.trim();
+  if (reason.length < 2) {
+    return fail("선물 사유를 2자 이상 입력해주세요.");
+  }
+
+  const { supabase, user } = await getUser();
+  if (!user) return fail("로그인이 필요해요. 다시 로그인해주세요.");
+
+  const { error } = await supabase.rpc("mentor_award_free_stamp", {
+    p_student: payload.studentId,
+    p_reason: reason,
+  });
+  if (error) {
+    return fail(error.message || "도장 선물에 실패했어요. 잠시 후 다시 시도해주세요.");
+  }
+
+  revalidatePath("/mentor");
+  revalidatePath("/student");
+  revalidatePath("/student/records");
+  return OK;
 }

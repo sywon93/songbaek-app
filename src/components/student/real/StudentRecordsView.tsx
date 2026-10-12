@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  Gift,
   MessageCircle,
   MessageCircleQuestion,
   NotebookPen,
@@ -18,20 +19,52 @@ import type { Database } from "@/lib/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type StudyRecord = Database["public"]["Tables"]["study_records"]["Row"];
+type StampAward = Pick<
+  Database["public"]["Tables"]["stamp_awards"]["Row"],
+  "id" | "reason" | "awarded_at"
+>;
 
 const formatDateTime = formatSeoulDateTime;
+
+// 학습 일지(날짜별 1건)와 멘토가 자율로 선물한 보너스 도장(날짜 무관, 여러 건
+// 가능)을 하나의 시간순 흐름으로 보여주기 위한 합친 피드 항목입니다.
+type FeedItem =
+  | { kind: "record"; sortKey: string; record: StudyRecord }
+  | { kind: "award"; sortKey: string; award: StampAward };
+
+function seoulDatePart(iso: string): string {
+  return (
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(iso))
+  );
+}
 
 export function StudentRecordsListView({
   profile,
   records,
+  stampAwards,
 }: {
   profile: Profile;
   records: StudyRecord[];
+  stampAwards: StampAward[];
 }) {
   const approvedCount = records.filter((r) => r.status === "approved").length;
   const feedbackCount = records.filter(
     (r) => r.status === "approved" && r.encouragement_message,
   ).length;
+
+  const feed: FeedItem[] = [
+    ...records.map((record): FeedItem => ({ kind: "record", sortKey: record.record_date, record })),
+    ...stampAwards.map((award): FeedItem => ({
+      kind: "award",
+      sortKey: seoulDatePart(award.awarded_at),
+      award,
+    })),
+  ].sort((a, b) => {
+    const d = b.sortKey.localeCompare(a.sortKey);
+    if (d !== 0) return d;
+    // 같은 날짜면 보너스 도장을 일지보다 먼저 보여줍니다(받은 시각 기준 최신이라).
+    return a.kind === b.kind ? 0 : a.kind === "award" ? -1 : 1;
+  });
 
   return (
     <div>
@@ -49,12 +82,34 @@ export function StudentRecordsListView({
             <NotebookPen size={20} className="text-rose-500" /> 내 학습 기록 &amp; 멘토 피드백
           </h1>
           <p className="text-sm text-gray-500">
-            전체 {records.length}일 · 도장 {approvedCount}개 · 멘토 피드백 {feedbackCount}건
+            전체 {records.length}일 · 도장 {approvedCount + stampAwards.length}개
+            {stampAwards.length > 0 && ` (특별 도장 ${stampAwards.length}개 포함)`} · 멘토
+            피드백 {feedbackCount}건
           </p>
         </div>
 
         <section className="space-y-2">
-          {records.map((r) => {
+          {feed.map((item) => {
+            if (item.kind === "award") {
+              const a = item.award;
+              return (
+                <div
+                  key={`award-${a.id}`}
+                  className="flex items-start gap-2.5 rounded-2xl border-2 border-amber-200 bg-amber-50/80 p-3.5 shadow-md backdrop-blur"
+                >
+                  <Gift size={16} className="mt-0.5 shrink-0 text-amber-500" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-amber-800">🎁 멘토님의 특별 도장</p>
+                    <p className="mt-0.5 text-sm text-amber-900">{a.reason}</p>
+                    <p className="mt-1 text-[11px] text-amber-600">
+                      {formatDateTime(a.awarded_at) ?? ""}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
+            const r = item.record;
             const hasFeedback = r.status === "approved" && !!r.encouragement_message;
             return (
               <Link
@@ -95,7 +150,7 @@ export function StudentRecordsListView({
             );
           })}
 
-          {records.length === 0 && (
+          {feed.length === 0 && (
             <p className="rounded-xl bg-gray-50 p-4 text-center text-sm text-gray-400">
               아직 학습 기록이 없어요. 오늘의 학습을 시작해보세요!
             </p>

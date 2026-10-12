@@ -3,10 +3,9 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  CalendarClock,
   CalendarSearch,
   ChevronDown,
-  Clock3,
+  Gift,
   History,
   MessageCircleQuestion,
   Reply,
@@ -16,11 +15,11 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RealTopBar } from "@/components/RealTopBar";
+import { Modal } from "@/components/ui/Modal";
+import { Toast, friendlyErrorMessage, type ToastMessage } from "@/components/ui/Toast";
 import { ZoomableImage } from "@/components/ui/ZoomableImage";
-import { approveToday } from "@/lib/actions/study";
-import { weekdayLabel } from "@/lib/date";
-import { mentoringSlotLabel, mentoringSlotsForCount } from "@/lib/mentoring";
-import type { Database, MentoringTimeSlot, Weekday } from "@/lib/supabase/types";
+import { approveToday, awardFreeStamp } from "@/lib/actions/study";
+import type { Database } from "@/lib/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type StudyRecord = Database["public"]["Tables"]["study_records"]["Row"];
@@ -31,15 +30,6 @@ export interface StudentWithRecord {
   plannerPhotoUrl: string | null;
   studyPhotoUrl: string | null;
 }
-
-export interface StudentScheduleEntry {
-  profile: Profile;
-  mentoringDay: Weekday;
-  nextSessionDate: string;
-  reservedSlot: MentoringTimeSlot | null;
-}
-
-const WEEKDAY_ORDER: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
 
 function studentAnchorId(studentId: string) {
   return `student-${studentId}`;
@@ -56,7 +46,6 @@ export function RealMentorView({
   mentor,
   students,
   date,
-  scheduleEntries,
   pastPending,
   browseDate,
   browseEntries,
@@ -64,7 +53,6 @@ export function RealMentorView({
   mentor: Profile;
   students: StudentWithRecord[];
   date: string;
-  scheduleEntries: StudentScheduleEntry[];
   pastPending: StudentWithRecord[];
   browseDate: string | null;
   browseEntries: StudentWithRecord[];
@@ -90,8 +78,6 @@ export function RealMentorView({
           </p>
         </div>
 
-        <MentoringScheduleSection entries={scheduleEntries} />
-
         <PastPendingSection entries={pastPending} />
 
         <div className="space-y-2.5">
@@ -109,77 +95,6 @@ export function RealMentorView({
         <DateBrowseSection browseDate={browseDate} entries={browseEntries} today={date} />
       </main>
     </div>
-  );
-}
-
-function MentoringScheduleSection({ entries }: { entries: StudentScheduleEntry[] }) {
-  const days = WEEKDAY_ORDER.filter((day) => entries.some((e) => e.mentoringDay === day));
-
-  return (
-    <section className="rounded-2xl border-2 border-white/70 bg-white/85 p-4 shadow-md backdrop-blur">
-      <h2 className="flex items-center gap-1.5 text-base font-bold text-gray-800">
-        <CalendarClock size={16} className="text-violet-500" /> 요일별 상담 신청 명단
-      </h2>
-      <p className="mt-0.5 text-xs text-gray-400">
-        담당 학생의 지정 요일별 다음 상담일 예약 현황이에요. 학생을 누르면 아래 학습 기록으로 이동해요.
-      </p>
-
-      {days.length === 0 && (
-        <p className="mt-3 rounded-xl bg-gray-50 p-3 text-center text-xs text-gray-400">
-          상담 요일이 지정된 담당 학생이 없어요.
-        </p>
-      )}
-
-      <div className="mt-3 space-y-3">
-        {days.map((day) => {
-          const dayEntries = entries.filter((e) => e.mentoringDay === day);
-          const sessionDate = dayEntries[0]?.nextSessionDate;
-          const slots = mentoringSlotsForCount(dayEntries.length);
-          return (
-            <div key={day} className="rounded-xl border border-gray-100 bg-gray-50/60 p-3">
-              <div className="mb-1 flex items-center justify-between">
-                <p className="text-sm font-bold text-gray-700">
-                  {weekdayLabel(day)}
-                  <span className="ml-1.5 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-500">
-                    {dayEntries.length}명 · {slots.length}타임제
-                  </span>
-                </p>
-                <p className="text-[11px] text-gray-400">{sessionDate} 상담 예정</p>
-              </div>
-              <p className="mb-2 text-[11px] text-gray-400">
-                {slots.map((s) => mentoringSlotLabel(s)).join(" / ")}
-              </p>
-              <ul className="space-y-1.5">
-                {dayEntries.map((entry) => (
-                  <li key={entry.profile.id}>
-                    <a
-                      href={`#${studentAnchorId(entry.profile.id)}`}
-                      className="flex min-h-11 items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm shadow-sm active:scale-[0.99]"
-                    >
-                      <span className="flex-1 truncate">
-                        <span className="font-medium text-gray-800">{entry.profile.name}</span>
-                        <span className="ml-1.5 text-xs text-gray-400">
-                          학번 {entry.profile.username ?? "미지정"}
-                        </span>
-                      </span>
-                      {entry.reservedSlot ? (
-                        <span className="flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-600">
-                          <Clock3 size={10} /> {mentoringSlotLabel(entry.reservedSlot)}
-                        </span>
-                      ) : (
-                        <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-400">
-                          미예약
-                        </span>
-                      )}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
@@ -316,20 +231,23 @@ function ReviewCard({
       id={cardId}
       className="scroll-mt-20 rounded-2xl border-2 border-white/70 bg-white/85 shadow-md backdrop-blur"
     >
-      <button
-        type="button"
-        onClick={() => canExpand && setExpanded((v) => !v)}
-        className="flex min-h-16 w-full items-center gap-3 p-3.5 text-left"
-      >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-sm font-bold text-rose-600">
-          {student.name.slice(0, 1)}
-        </div>
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-gray-800">{student.name}</p>
-          <p className="text-xs text-gray-400">
-            학번 {student.username ?? "미지정"} · 도장 {student.stamp_count}/{student.stamp_goal}
-          </p>
-        </div>
+      <div className="flex min-h-16 w-full items-center gap-2 p-3.5">
+        <button
+          type="button"
+          onClick={() => canExpand && setExpanded((v) => !v)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-sm font-bold text-rose-600">
+            {student.name.slice(0, 1)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-gray-800">{student.name}</p>
+            <p className="text-xs text-gray-400">
+              학번 {student.username ?? "미지정"} · 도장 {student.stamp_count}/{student.stamp_goal}
+            </p>
+          </div>
+        </button>
+        <GiftStampButton studentId={student.id} studentName={student.name} />
         {variant === "past" && record && (
           <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
             {formatDateLabel(record.record_date)}
@@ -337,9 +255,16 @@ function ReviewCard({
         )}
         <StatusBadge status={status} />
         {canExpand && (
-          <ChevronDown size={16} className={`text-gray-400 transition ${expanded ? "rotate-180" : ""}`} />
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-label={expanded ? "접기" : "펼치기"}
+            className="shrink-0 p-1 text-gray-400"
+          >
+            <ChevronDown size={16} className={`transition ${expanded ? "rotate-180" : ""}`} />
+          </button>
         )}
-      </button>
+      </div>
 
       {expanded && canExpand && (
         <div className="space-y-3 border-t border-gray-100 p-3">
@@ -437,5 +362,75 @@ function ReviewCard({
         </div>
       )}
     </div>
+  );
+}
+
+// 일지 승인과 무관하게, 멘토가 사유를 적어 멘티에게 도장을 1개 자유롭게
+// 선물하는 버튼 + 모달. 예약 인원 제한 같은 경쟁 조건이 없어 멘티 수가
+// 늘어나도 안전하게 동작합니다.
+function GiftStampButton({ studentId, studentName }: { studentId: string; studentName: string }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [pending, startTransition] = useTransition();
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  const canSubmit = reason.trim().length >= 2 && !pending;
+
+  const handleGift = () => {
+    if (!canSubmit) return;
+    startTransition(async () => {
+      try {
+        const res = await awardFreeStamp({ studentId, reason });
+        if (!res.ok) {
+          setToast({ text: res.message, variant: "error" });
+          return;
+        }
+        setToast({ text: `${studentName}님에게 도장을 선물했어요! 🎁`, variant: "success" });
+        setReason("");
+        setOpen(false);
+      } catch (e) {
+        setToast({ text: friendlyErrorMessage(e), variant: "error" });
+      }
+    });
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex shrink-0 items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-700 hover:bg-amber-100 active:scale-[0.97]"
+      >
+        <Gift size={12} /> 도장 선물하기
+      </button>
+
+      <Modal open={open} onClose={() => !pending && setOpen(false)}>
+        <div className="space-y-3">
+          <h3 className="flex items-center gap-1.5 text-base font-bold text-gray-800">
+            <Gift size={18} className="text-amber-500" /> {studentName}님에게 도장 선물하기
+          </h3>
+          <p className="text-xs text-gray-400">
+            일지 승인과 별개로 도장을 바로 1개 지급해요. 어떤 점이 좋았는지 짧게 남겨주세요.
+          </p>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={2}
+            placeholder="예) 숙제 우수 / 태도 좋음 / 질문을 적극적으로 함"
+            className="w-full resize-none rounded-lg border border-gray-300 px-3 py-3 text-base focus:border-amber-400 focus:outline-none"
+          />
+          <button
+            type="button"
+            disabled={!canSubmit}
+            onClick={handleGift}
+            className="flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 py-3 text-sm font-semibold text-white transition active:scale-[0.99] hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-gray-300"
+          >
+            <Gift size={16} /> {pending ? "선물하는 중..." : "도장 선물하기"}
+          </button>
+        </div>
+      </Modal>
+
+      <Toast message={toast} onClose={() => setToast(null)} />
+    </>
   );
 }

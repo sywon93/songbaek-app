@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import {
   BadgeCheck,
-  CalendarClock,
   CheckCircle2,
   Clock,
+  Gift,
   Hourglass,
   Lock,
   MapPin,
@@ -20,26 +20,22 @@ import {
   RefreshCw,
   Sparkles,
   StickyNote,
-  X,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { PhotoUploader } from "@/components/ui/PhotoUploader";
 import { RealTopBar } from "@/components/RealTopBar";
 import { startNextRound, startToday, submitToday } from "@/lib/actions/study";
-import {
-  cancelMentoringReservation,
-  reserveMentoringSlot,
-  type ActionResult,
-} from "@/lib/actions/mentoring";
-import { formatSeoulDateTime, weekdayLabel } from "@/lib/date";
-import { mentoringSlotLabel } from "@/lib/mentoring";
-import { Toast, friendlyErrorMessage, type ToastMessage } from "@/components/ui/Toast";
+import { formatSeoulDateTime } from "@/lib/date";
+import { friendlyErrorMessage } from "@/components/ui/Toast";
 import type { Database } from "@/lib/supabase/types";
 
-type SlotStatus = Database["public"]["Functions"]["mentoring_slot_status"]["Returns"][number];
 type NoticePreview = Pick<
   Database["public"]["Tables"]["notices"]["Row"],
   "id" | "title" | "is_pinned" | "created_at"
+>;
+type StampAward = Pick<
+  Database["public"]["Tables"]["stamp_awards"]["Row"],
+  "id" | "reason" | "awarded_at"
 >;
 
 const AddToHomeScreenTip = dynamic(
@@ -69,19 +65,17 @@ export function RealStudentView({
   record,
   plannerPhotoUrl,
   studyPhotoUrl,
-  mentoringDate,
-  slotStatus,
   notices,
   reviewerName,
+  recentAwards,
 }: {
   profile: Profile;
   record: StudyRecord | null;
   plannerPhotoUrl: string | null;
   studyPhotoUrl: string | null;
-  mentoringDate: string | null;
-  slotStatus: SlotStatus[] | null | undefined;
   notices: NoticePreview[] | null | undefined;
   reviewerName: string | null;
+  recentAwards: StampAward[] | null | undefined;
 }) {
   const { stamp_count: stampCount, stamp_goal: stampGoal, round } = profile;
   const achieved = stampCount >= stampGoal;
@@ -261,6 +255,8 @@ export function RealStudentView({
           </Modal>
         </section>
 
+        <RecentAwardsSection awards={recentAwards} />
+
         {/* 오늘의 학습 시작 */}
         <section className="rounded-2xl border-2 border-white/70 bg-white/85 p-3 shadow-md backdrop-blur sm:p-4">
           <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-gray-800">
@@ -359,124 +355,36 @@ export function RealStudentView({
           )}
         </section>
 
-        <MentoringReservationSection
-          mentoringDay={profile.mentoring_day}
-          mentoringDate={mentoringDate}
-          slotStatus={slotStatus}
-        />
       </main>
     </div>
   );
 }
 
-function MentoringReservationSection({
-  mentoringDay,
-  mentoringDate,
-  slotStatus,
-}: {
-  mentoringDay: Profile["mentoring_day"];
-  mentoringDate: string | null;
-  slotStatus: SlotStatus[] | null | undefined;
-}) {
-  const [pending, startTransitionFn] = useTransition();
-  const [toast, setToast] = useState<ToastMessage | null>(null);
-
-  const run = (fn: () => Promise<ActionResult>, successText?: string) => {
-    setToast(null);
-    startTransitionFn(async () => {
-      try {
-        const res = await fn();
-        if (!res.ok) {
-          setToast({ text: res.message, variant: "error" });
-        } else if (successText) {
-          setToast({ text: successText, variant: "success" });
-        }
-      } catch (e) {
-        setToast({ text: friendlyErrorMessage(e), variant: "error" });
-      }
-    });
-  };
-
-  // slotStatus 는 서버 RPC(mentoring_slot_status) 결과를 그대로 받는데, 조회가
-  // 실패/타임아웃하면 null 이 올 수 있고 예상치 못한 형태(객체 등)일 가능성도
-  // 있으므로, 렌더 중 .map/.find 가 터지지 않도록 항상 배열로 정규화합니다.
-  const slots: SlotStatus[] = Array.isArray(slotStatus) ? slotStatus : [];
-  const mine = slots.find((s) => s.is_mine);
+// 멘토가 "도장 선물하기"로 부여한 보너스 도장을 가장 최근 것부터 보여줍니다.
+// 갑자기 도장이 늘어나 당황하지 않도록, 도장판 바로 아래(가장 먼저 눈에
+// 띄는 자리)에서 사유를 명확히 알려줍니다. 전체 이력은 "내 학습 기록" 쪽에서도
+// 볼 수 있어요.
+function RecentAwardsSection({ awards }: { awards: StampAward[] | null | undefined }) {
+  const list = Array.isArray(awards) ? awards : [];
+  if (list.length === 0) return null;
 
   return (
-    <section className="rounded-2xl border-2 border-white/70 bg-white/85 p-3 shadow-md backdrop-blur sm:p-4">
-      <h2 className="mb-1 flex items-center gap-2 text-base font-bold text-gray-800">
-        <CalendarClock size={18} className="text-rose-500" /> 멘토링 현장 만남 예약
-      </h2>
-
-      {!mentoringDay && (
-        <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-400">
-          지정된 멘토링 요일이 없어요. 담당 선생님(관리자)에게 문의해주세요.
-        </p>
-      )}
-
-      {mentoringDay && mentoringDate && (
-        <div className="space-y-3">
-          <p className="text-xs text-gray-500">
-            지정 요일 <span className="font-semibold text-gray-700">{weekdayLabel(mentoringDay)}</span> · 다음 세션{" "}
-            <span className="font-semibold text-gray-700">{mentoringDate}</span>
-          </p>
-
-          {slots.length === 0 ? (
-            <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-400">
-              아직 예약 가능한 시간대가 없어요. 담당 멘토·요일이 배정되면 나타나요.
+    <section className="space-y-2">
+      {list.map((a) => (
+        <div
+          key={a.id}
+          className="flex items-start gap-2.5 rounded-2xl border-2 border-amber-200 bg-amber-50/80 p-3.5 shadow-md backdrop-blur"
+        >
+          <Gift size={18} className="mt-0.5 shrink-0 text-amber-500" />
+          <div>
+            <p className="text-sm font-bold text-amber-800">🎁 멘토님의 특별 도장</p>
+            <p className="mt-0.5 text-sm text-amber-900">{a.reason}</p>
+            <p className="mt-1 text-[11px] text-amber-600">
+              {formatSeoulDateTime(a.awarded_at) ?? ""}
             </p>
-          ) : (
-            <>
-              <p className="text-[11px] text-gray-400">
-                이번 세션은 {slots.length}타임제예요. (인원수에 맞춰 휴식시간이 반영됩니다)
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {slots.map((slot, i) => {
-                  const isTaken = slot.is_taken;
-                  const isMine = slot.is_mine;
-                  const disabled = pending || (isTaken && !isMine) || (mine !== undefined && !isMine);
-
-                  return (
-                    <button
-                      key={`${slot.time_slot}-${i}`}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => run(() => reserveMentoringSlot(slot.time_slot), "예약했어요! 🎉")}
-                      className={`min-h-14 rounded-xl border-2 px-2 py-2.5 text-center text-sm font-semibold transition ${
-                        isMine
-                          ? "border-rose-400 bg-rose-50 text-rose-600"
-                          : isTaken
-                            ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300"
-                            : "border-gray-200 bg-white text-gray-700 hover:border-rose-300 active:scale-[0.99] disabled:opacity-60"
-                      }`}
-                    >
-                      <span className="block text-[11px] font-bold text-gray-400">{i + 1}타임</span>
-                      {mentoringSlotLabel(slot.time_slot)}
-                      <span className="mt-0.5 block text-[11px] font-medium">
-                        {isMine ? "내 예약" : isTaken ? "마감" : "예약 가능"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {mine?.reservation_id && (
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => run(() => cancelMentoringReservation(mine.reservation_id!), "예약을 취소했어요.")}
-              className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border border-gray-200 bg-white py-2.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 disabled:opacity-60"
-            >
-              <X size={12} /> 예약 취소
-            </button>
-          )}
+          </div>
         </div>
-      )}
-
-      <Toast message={toast} onClose={() => setToast(null)} />
+      ))}
     </section>
   );
 }

@@ -20,11 +20,24 @@ export default async function StudentRecordsPage() {
   if (!profile) redirect("/login");
   if (profile.role !== "student") redirect(`/${profile.role}`);
 
-  const { data: records } = await supabase
-    .from("study_records")
-    .select("*")
-    .eq("student_id", user.id)
-    .order("record_date", { ascending: false });
+  const [{ data: records }, { data: stampAwards }] = await Promise.all([
+    supabase
+      .from("study_records")
+      .select("*")
+      .eq("student_id", user.id)
+      .order("record_date", { ascending: false }),
+    supabase
+      .from("stamp_awards")
+      .select("id, reason, awarded_at")
+      .eq("student_id", user.id)
+      .order("awarded_at", { ascending: false }),
+  ]);
 
-  return <StudentRecordsListView profile={profile} records={records ?? []} />;
+  return (
+    <StudentRecordsListView
+      profile={profile}
+      records={records ?? []}
+      stampAwards={stampAwards ?? []}
+    />
+  );
 }

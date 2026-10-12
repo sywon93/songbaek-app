@@ -78,8 +78,6 @@ export function studyDateLabel(dateStr: string): string {
   return `${m}월 ${d}일 (${wd})`;
 }
 
-const WEEKDAY_ORDER: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
-
 const WEEKDAY_LABEL: Record<Weekday, string> = {
   mon: "월요일",
   tue: "화요일",
@@ -90,21 +88,4 @@ const WEEKDAY_LABEL: Record<Weekday, string> = {
 
 export function weekdayLabel(day: Weekday): string {
   return WEEKDAY_LABEL[day];
-}
-
-// profiles.mentoring_day(요일)에 해당하는 다음 세션 날짜(오늘 포함, Asia/Seoul 기준)를
-// "YYYY-MM-DD" 문자열로 계산합니다. DB의 check_mentoring_reservation 트리거가 이
-// 계산과 동일한 규칙(isodow 일치)으로 한 번 더 검증합니다.
-export function nextMentoringDateStr(day: Weekday): string {
-  const [y, m, d] = todaySeoulDateStr().split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  const todayIsodow = date.getDay() === 0 ? 7 : date.getDay();
-  const targetIsodow = WEEKDAY_ORDER.indexOf(day) + 1;
-  const diff = (targetIsodow - todayIsodow + 7) % 7;
-  date.setDate(date.getDate() + diff);
-
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
 }
