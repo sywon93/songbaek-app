@@ -156,6 +156,24 @@ export interface Database {
           },
         ];
       };
+      reward_claims: {
+        Row: {
+          student_id: string;
+          round: number;
+          stage: number;
+          claimed_at: string;
+          claimed_by: string | null;
+        };
+        Insert: {
+          student_id: string;
+          round: number;
+          stage: number;
+          claimed_at?: string;
+          claimed_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["reward_claims"]["Insert"]>;
+        Relationships: [];
+      };
       notices: {
         Row: {
           id: string;

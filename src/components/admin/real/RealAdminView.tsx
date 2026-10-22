@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { BarChart3, ClipboardList, Megaphone, Pencil, Plus, ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { BarChart3, ClipboardList, Gift, Megaphone, Pencil, Plus, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RealTopBar } from "@/components/RealTopBar";
@@ -74,6 +74,16 @@ export function RealAdminView({
             <Megaphone size={16} className="text-rose-500" /> 공지사항 관리
           </span>
           <span className="text-xs font-medium text-gray-400">작성 · 수정 · 삭제 →</span>
+        </Link>
+
+        <Link
+          href="/admin/rewards"
+          className="flex min-h-12 items-center justify-between rounded-2xl border-2 border-white/70 bg-white/85 px-4 py-3 text-sm font-bold text-gray-800 shadow-md backdrop-blur active:scale-[0.99]"
+        >
+          <span className="flex items-center gap-2">
+            <Gift size={16} className="text-amber-500" /> 선물 수령 체크
+          </span>
+          <span className="text-xs font-medium text-gray-400">누가 받아 갔는지 →</span>
         </Link>
 
         <div className="grid grid-cols-3 gap-2">
