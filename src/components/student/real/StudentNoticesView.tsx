@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { ArrowLeft, Megaphone, Pin } from "lucide-react";
+import { ArrowLeft, Image as ImageIcon, Megaphone, Pin } from "lucide-react";
 import { RealTopBar } from "@/components/RealTopBar";
+import { ZoomableImage } from "@/components/ui/ZoomableImage";
 import { formatSeoulDate } from "@/lib/date";
 import type { Database } from "@/lib/supabase/types";
 
 type Notice = Pick<
   Database["public"]["Tables"]["notices"]["Row"],
-  "id" | "title" | "is_pinned" | "created_at"
+  "id" | "title" | "is_pinned" | "image_paths" | "created_at"
 >;
 
 export function StudentNoticesListView({
@@ -47,6 +48,11 @@ export function StudentNoticesListView({
                 </span>
               )}
               <span className="flex-1 truncate text-sm font-semibold text-gray-800">{n.title}</span>
+              {n.image_paths.length > 0 && (
+                <span className="flex shrink-0 items-center gap-0.5 text-[11px] text-gray-400" title="사진 첨부">
+                  <ImageIcon size={12} /> {n.image_paths.length}
+                </span>
+              )}
               <span className="shrink-0 text-[11px] text-gray-400">
                 {formatSeoulDate(n.created_at)}
               </span>
@@ -64,9 +70,11 @@ export function StudentNoticesListView({
 export function StudentNoticeDetailView({
   profile,
   notice,
+  photoUrls,
 }: {
   profile: Database["public"]["Tables"]["profiles"]["Row"];
   notice: Database["public"]["Tables"]["notices"]["Row"];
+  photoUrls: string[];
 }) {
   return (
     <div>
@@ -92,6 +100,19 @@ export function StudentNoticeDetailView({
           </div>
           <h1 className="text-lg font-bold text-gray-800">{notice.title}</h1>
           <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-gray-600">{notice.content}</p>
+          {photoUrls.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {photoUrls.map((src, i) => (
+                <ZoomableImage
+                  key={src}
+                  src={src}
+                  alt={`${notice.title} 사진 ${i + 1}`}
+                  caption={`${notice.title} · 사진 ${i + 1}/${photoUrls.length}`}
+                  thumbClassName="max-h-[28rem] w-full object-contain"
+                />
+              ))}
+            </div>
+          )}
         </article>
       </main>
     </div>

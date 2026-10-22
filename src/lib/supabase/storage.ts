@@ -27,6 +27,30 @@ export async function uploadStudyPhoto(
   return path;
 }
 
+export const NOTICE_PHOTO_BUCKET = "notice-photos";
+export const MAX_NOTICE_PHOTOS = 5;
+
+/** 공지 사진 경로는 "{uuid}.jpg" 형태만 허용합니다. */
+export function isNoticePhotoPath(path: unknown): path is string {
+  return typeof path === "string" && /^[0-9a-f-]{36}\.jpg$/.test(path);
+}
+
+/** 공지 사진 경로 목록을 서명된 URL로 한 번에 변환합니다. 실패한 항목은 빠집니다. */
+export async function getSignedNoticePhotoUrls(
+  supabase: SupabaseClient<Database>,
+  paths: string[],
+): Promise<Record<string, string>> {
+  if (paths.length === 0) return {};
+  const { data } = await supabase.storage
+    .from(NOTICE_PHOTO_BUCKET)
+    .createSignedUrls(paths, 60 * 60);
+  const urls: Record<string, string> = {};
+  for (const item of data ?? []) {
+    if (item.path && item.signedUrl) urls[item.path] = item.signedUrl;
+  }
+  return urls;
+}
+
 /** 비공개 버킷의 경로를 짧은 유효기간의 서명된 URL로 변환합니다. */
 export async function getSignedPhotoUrl(
   supabase: SupabaseClient<Database>,

@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
+import { getSignedNoticePhotoUrls } from "@/lib/supabase/storage";
 import { StudentNoticeDetailView } from "@/components/student/real/StudentNoticesView";
 
 export default async function StudentNoticeDetailPage({
@@ -32,5 +33,8 @@ export default async function StudentNoticeDetailPage({
     .maybeSingle();
   if (!notice) notFound();
 
-  return <StudentNoticeDetailView profile={profile} notice={notice} />;
+  const signed = await getSignedNoticePhotoUrls(supabase, notice.image_paths);
+  const photoUrls = notice.image_paths.map((p) => signed[p]).filter(Boolean);
+
+  return <StudentNoticeDetailView profile={profile} notice={notice} photoUrls={photoUrls} />;
 }

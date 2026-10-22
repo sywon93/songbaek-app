@@ -22,7 +22,7 @@ export default async function StudentNoticesPage() {
 
   const { data: notices } = await supabase
     .from("notices")
-    .select("id, title, is_pinned, created_at")
+    .select("id, title, is_pinned, image_paths, created_at")
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false });
 

@@ -162,6 +162,7 @@ export interface Database {
           title: string;
           content: string;
           is_pinned: boolean;
+          image_paths: string[];
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -171,6 +172,7 @@ export interface Database {
           title: string;
           content: string;
           is_pinned?: boolean;
+          image_paths?: string[];
           created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["notices"]["Insert"]>;

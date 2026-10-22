@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
+import { getSignedNoticePhotoUrls } from "@/lib/supabase/storage";
 import { AdminNoticesView } from "@/components/admin/real/AdminNoticesView";
 
 export default async function AdminNoticesPage() {
@@ -26,5 +27,10 @@ export default async function AdminNoticesPage() {
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false });
 
-  return <AdminNoticesView admin={profile} notices={notices ?? []} />;
+  const photoUrls = await getSignedNoticePhotoUrls(
+    supabase,
+    (notices ?? []).flatMap((n) => n.image_paths),
+  );
+
+  return <AdminNoticesView admin={profile} notices={notices ?? []} photoUrls={photoUrls} />;
 }
